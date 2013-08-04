@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # bontmia (Backup Over Network To Multiple Incremental Archives)
 #
@@ -8,6 +8,13 @@
 #
 # Written by John Enok Vollestad in April 2003 and have later
 # undergone some bugfixes and enhancements.
+#
+# Bugfixes and enhancements:
+# Copyright (c) 2012 Marcel Pennewiss (opensource@pennewiss.de)
+#
+# Changelog:
+#   0.15 - adding identity (ssh key), exclude-from, sudo and stats option
+#          cleanup temporary files
 
 print_usage()
 {
@@ -15,7 +22,7 @@ print_usage()
 
 NAME
         Bontmia - Backup Over Network To Multiple Incremental Archives
-        Version 0.14
+        Version 0.15
 
 SYNOPSIS
         bontmia --dest <dest. dir> [options] [source dir [source dir ...]]
@@ -120,6 +127,17 @@ OPTIONS
                 Specifies the port number to connect to on the remote
                 host when using ssh, which is the only option.
 
+	--identity <file>
+		Specifies the private key file for ssh
+	
+	--exclude-from <file>
+	        Read rsync exclude patterns from file
+
+	--sudo
+	        Execute rsync with sudo on remote
+
+        --stats
+                Output rsync stats at the end
 
 EXAMPLES
         bontmia --dest ./backup  --rotation \\
@@ -172,6 +190,9 @@ CONTACT
         selection of long term storage.  It has later undergone some
         bugfixes and enhancements. http://folk.uio.no/johnen/bontmia/
 
+	Enhanced version will be available on
+	https://github.com/mape2k/bontmia
+
 EOF
     exit 1
 }
@@ -180,8 +201,17 @@ EOF
 unlock_destination()
 {
     rm -f "${tmpdir}/is_running.lock"
+    rm -f /tmp/bontmia_rsync_output.$$ > /dev/null 2>&1
+    rm -f /tmp/bontmia_rsync_output.$$.2 > /dev/null 2>&1
 }
 
+output_rsync_stats()
+{
+    echo ""
+    echo "Rsync statistics"
+    echo ""
+    cat /tmp/bontmia_rsync_output.$$ | sed -n '/^Number of files: [0-9]*$/,/^total size is$/p'
+}
 
 lock_destination()
 {
@@ -350,14 +380,14 @@ make_backup()
 	if test "x$dryrun" == "xno"; then
 	    mkdir -p "$tmpdir/unfinished_backup/$this_backup/$hostname"
 
-	    rsync ${rsync_options} -e "ssh -p $port" "${dir}" "${tmpdir}/unfinished_backup/$this_backup/${hostname}" 2>&1 >/tmp/bontmia_rsync_output.$$ || {
+	    rsync ${rsync_options} -e "ssh -p $port $identity" "${dir}/" "${tmpdir}/unfinished_backup/$this_backup/${hostname}" 2>&1 >/tmp/bontmia_rsync_output.$$ || {
 		echo
 		echo "  Caught an error doing rsync (return code $?)"
 		echo "  The last 10 lines of output from rsync:"
 		tail -10 /tmp/bontmia_rsync_output.$$
 		echo
 		echo "  Retrying rsync..."
-		rsync ${rsync_options} -e "ssh -p $port" "${dir}" "${tmpdir}/unfinished_backup/$this_backup/${hostname}" 2>&1 >/tmp/bontmia_rsync_output.$$ || {
+		rsync ${rsync_options} -e "ssh -p $port $identity" "${dir}/" "${tmpdir}/unfinished_backup/$this_backup/${hostname}" 2>&1 >/tmp/bontmia_rsync_output.$$.2 || {
 		    echo
 		    echo "  Still no luck.  Rsync failed with returncode $?"
 		    echo "  $dir"
@@ -600,6 +630,10 @@ backup_dirs=""
 exit_status="0"
 do_del_old="no"
 port="22"
+identity=""
+excludefrom=""
+sudo=""
+stats=""
 compression=""
 rotation=""
 dryrun="no"
@@ -634,6 +668,20 @@ print "years:$6\n";
 	    shift
 	    port="$1"
 	    shift;;
+	( "--identity" )
+	    shift
+	    identity="-i $1"
+	    shift;;
+	( "--exclude-from" )
+	    shift
+	    excludefrom="--exclude-from=$1"
+	    shift;;
+	( "--sudo" )
+	    shift
+	    sudo="--rsync-path='sudo rsync'";;
+        ( "--stats" )
+	    shift
+	    stats="--stats";;
 	( "--bwlimit" )
 	    shift
 	    bwlimit="--bwlimit=$1"
@@ -696,7 +744,7 @@ done
 check_for_programs
 
 tmpdir=${tmpdir:-"$backup_destination"}
-rsync_options="-azv -T $tmpdir --force --relative --hard-links --delete $bwlimit" # --stats"
+rsync_options="$sudo -azv -T $tmpdir --force --relative --hard-links --delete $bwlimit $excludefrom $stats"
 
 # to speed up checking for files outside the backup areas
 bdirmatch=$(
@@ -734,6 +782,10 @@ fi
 
 if test "x$do_del_old" == xyes; then
     delete_old_backup
+fi
+
+if test "x$stats" != x; then
+    output_rsync_stats
 fi
 
 unlock_destination
