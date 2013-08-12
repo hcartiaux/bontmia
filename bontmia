@@ -380,14 +380,14 @@ make_backup()
 	if test "x$dryrun" == "xno"; then
 	    mkdir -p "$tmpdir/unfinished_backup/$this_backup/$hostname"
 
-	    rsync ${rsync_options} -e "ssh -p $port $identity" "${dir}/" "${tmpdir}/unfinished_backup/$this_backup/${hostname}" 2>&1 >/tmp/bontmia_rsync_output.$$ || {
+	    rsync ${rsync_options} ${rsyncpath:+"${rsyncpath}"} -e "ssh -p $port $identity" "${dir}/" "${tmpdir}/unfinished_backup/$this_backup/${hostname}" 2>&1 >/tmp/bontmia_rsync_output.$$ || {
 		echo
 		echo "  Caught an error doing rsync (return code $?)"
 		echo "  The last 10 lines of output from rsync:"
 		tail -10 /tmp/bontmia_rsync_output.$$
 		echo
 		echo "  Retrying rsync..."
-		rsync ${rsync_options} -e "ssh -p $port $identity" "${dir}/" "${tmpdir}/unfinished_backup/$this_backup/${hostname}" 2>&1 >/tmp/bontmia_rsync_output.$$.2 || {
+		rsync ${rsync_options} ${rsyncpath:+"${rsyncpath}"} -e "ssh -p $port $identity" "${dir}/" "${tmpdir}/unfinished_backup/$this_backup/${hostname}" 2>&1 >/tmp/bontmia_rsync_output.$$.2 || {
 		    echo
 		    echo "  Still no luck.  Rsync failed with returncode $?"
 		    echo "  $dir"
@@ -632,7 +632,7 @@ do_del_old="no"
 port="22"
 identity=""
 excludefrom=""
-sudo=""
+rsyncpath=""
 stats=""
 compression=""
 rotation=""
@@ -678,7 +678,7 @@ print "years:$6\n";
 	    shift;;
 	( "--sudo" )
 	    shift
-	    sudo="--rsync-path='sudo rsync'";;
+	    rsyncpath="--rsync-path=sudo rsync";;
         ( "--stats" )
 	    shift
 	    stats="--stats";;
@@ -744,7 +744,7 @@ done
 check_for_programs
 
 tmpdir=${tmpdir:-"$backup_destination"}
-rsync_options="$sudo -azv -T $tmpdir --force --relative --hard-links --delete $bwlimit $excludefrom $stats"
+rsync_options="-azv -T $tmpdir --force --relative --hard-links --delete $bwlimit $excludefrom $stats"
 
 # to speed up checking for files outside the backup areas
 bdirmatch=$(
