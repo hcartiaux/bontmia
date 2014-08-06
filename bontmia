@@ -11,11 +11,11 @@
 
 print_usage()
 {
-    cat <<EOF | more
+    cat <<EOF | ${PAGER:-more}
 
 NAME
         Bontmia - Backup Over Network To Multiple Incremental Archives
-        Version 0.12
+        Version 0.13
 
 SYNOPSIS
         bontmia --dest <dest. dir> [options] [source dir [source dir ...]]
@@ -125,7 +125,7 @@ OPTIONS
                 should use logrotate or some other suitable program.
 
 EXAMPLES
-        bontmia --dest ./backup  --rotate \\
+        bontmia --dest ./backup  --rotation \\
                 5minutes0hours0days0weeks0month0years \\
                 foo@bar:/baz/zoot
 
@@ -139,7 +139,7 @@ EXAMPLES
         Hint: set the values for times shorter than the interval used
               when doing backup to 0.
 
-        bontmia --dest ./backup  --rotate \\
+        bontmia --dest ./backup  --rotation \\
                 0minutes0hours7days4weeks12month0years \\
                 foo@bar:/baz/zoot
 
@@ -148,7 +148,7 @@ EXAMPLES
         command to run nightly.
 
 
-        bontmia --dest ./backup  --rotate \\
+        bontmia --dest ./backup  --rotation \\
                 0minutes24hours7days4weeks12month0years \\
                 foo@bar:/baz/zoot
 
@@ -157,7 +157,7 @@ EXAMPLES
         will mean copying more data over the network.
 
 
-        bontmia --dryrun --dest ./backup  --rotate \\
+        bontmia --dryrun --dest ./backup  --rotation \\
                 0minutes24hours7days4weeks12month0years \\
                 /home/bar/baz foo.no:/var/db
 
@@ -333,10 +333,11 @@ make_backup()
     else
 	echo "Backing up by modifying the replication"
     fi
+
     for dir in $backup_dirs ; do
 	dir_wo_user=$(echo "$dir" | cut -f2- -d'@')
 	echo "  ${dir_wo_user}"
-	hostname=$(echo -n "$dir" | cut -f2- -d'@' | cut -f1 -d':')":"
+	hostname=$(echo "$dir" | cut -f2- -d'@' | cut -f1 -d':')":"
 	userhost=$(echo "$dir" | cut -f1 -d':')
 	
 	if test "x$hostname" == "x$(hostname):"; then
@@ -551,6 +552,14 @@ check_for_programs()
     check_program rsync
     check_program host
     check_program date
+    find /tmp -maxdepth 1 -mindepth 1 >/dev/null 2>/dev/null || {
+	echo "'find' on your system does not support the '--maxdepth' and"
+	echo "'--mindepth' options"
+	echo "You might not have the GNU version of 'find'"
+	echo "Aborting"
+	unlock_destination
+	exit 1
+    }
     date -d 20030303 >/dev/null 2>/dev/null || {
 	echo "'date' on your system does not support the '--date' option"
 	echo "You might not have the GNU version of 'date'"
