@@ -15,7 +15,7 @@ print_usage()
 
 NAME
         Bontmia - Backup Over Network To Multiple Incremental Archives
-        Version 0.13
+        Version 0.14
 
 SYNOPSIS
         bontmia --dest <dest. dir> [options] [source dir [source dir ...]]
@@ -111,18 +111,15 @@ OPTIONS
                 value of zero specifies no limit.  The default is no
                 limit.
 
+        --temp <temp dir>
+                Specifies the directory used for temporary files during
+                transfer.  NB! This MUST be on the same disk volume as
+                destination or incremental copy will not work.
+
         --port <number>
                 Specifies the port number to connect to on the remote
                 host when using ssh, which is the only option.
 
-        --logdest <destination dir>
-                Specifies a directory where a log is written.  This
-                log contain all the options given when bontmia were
-                run, the output from rsync and the output from bontmia.
-
-                The file name format is bontmia-YYYY-MM-DD-HH:MM.log.
-                There is no handling of removing old log files so you
-                should use logrotate or some other suitable program.
 
 EXAMPLES
         bontmia --dest ./backup  --rotation \\
@@ -182,7 +179,7 @@ EOF
 
 unlock_destination()
 {
-    rm -f "$backup_destination/is_running.lock"
+    rm -f "${tmpdir}/is_running.lock"
 }
 
 
@@ -190,13 +187,13 @@ lock_destination()
 {
     # Ensure that there is no other bontmia running against the same destination
     touch /tmp/bontmia_lock_file.$$
-    echo "no" | mv -i /tmp/bontmia_lock_file.$$ "$backup_destination"/is_running.lock 2>&1 | \
+    echo "no" | mv -i /tmp/bontmia_lock_file.$$ "${tmpdir}"/is_running.lock 2>&1 | \
 	grep "overwrite" >/dev/null 2>&1 && {
-	echo "Bontmia is already doing a backup on this destination:"
-	echo "    $backup_destination"
+	echo "Bontmia is already doing a backup on this tmpdir:"
+	echo "    ${tmpdir}"
 	echo
 	echo "    If you are sure this is false you can manually remove the lockfile:"
-	echo "        $backup_destination/is_running.lock"
+	echo "        ${tmpdir}/is_running.lock"
 	echo
 	exit 1
     }
@@ -204,12 +201,12 @@ lock_destination()
 
 
 full_name() {
-    host="$1";
-    if host $host | grep "domain name pointer" >/dev/null; then
-	host $host | cut -f5 -d' ' | sed -e 's/\.$//';
+    host="${1}";
+    if host ${host} | grep "domain name pointer" >/dev/null; then
+	host ${host} | cut -f5 -d' ' | sed -e 's/\.$//';
     else
-	if host $host | grep "has address" >/dev/null; then
-	    full_name $(host $host | grep "has address" | cut -f4 -d' ');
+	if host ${host} | grep "has address" >/dev/null; then
+	    full_name $(host ${host} | grep "has address" | cut -f4 -d' ');
 	fi;
     fi;
 }
@@ -217,67 +214,72 @@ full_name() {
 
 filter_template()
 {
-    attribute="$1"
-    grep_value="$2"
-    last_number="$3"
-    sort_options="$4"
-    template_name="$5"
+    attribute="${1}"
+    grep_value="${2}"
+    last_number="${3}"
+    sort_options="${4}"
+    template_name="${5}"
 
-    if test "x$sort_options" != x; then
-	sort="sort $sort_options"
+    if test "x${sort_options}" != x; then
+	sort="sort ${sort_options}"
     else
 	sort="cat"
     fi
 
-    cd "${backup_destination}"
-    for archive in */*/*/*; do
-	year=$(echo $archive | cut -f1 -d'/')
-	month=$(echo $archive | cut -f2 -d'/')
-	day=$(echo $archive | cut -f3 -d'/')
-	the_clock=$(echo $archive | cut -f4 -d'/')
-
-	the_date=$year-$month-$day
-	date -d "$the_date" "+%Y/%m/%d/${the_clock}@${template_name}@${attribute}" || {
-	    echo "Could not read the time of a previous backup"
-	    echo "Please email the author"
-	    unlock_destination
-	    exit 1
-	}
-    done | egrep "@.*@${grep_value}" | sort -r | $sort | tail -${last_number}
+    (
+	cd "${backup_destination}"
+	for archive in */*/*/*; do
+	    year=$(echo ${archive} | cut -f1 -d'/')
+	    month=$(echo ${archive} | cut -f2 -d'/')
+	    day=$(echo ${archive} | cut -f3 -d'/')
+	    the_clock=$(echo ${archive} | cut -f4 -d'/')
+	    
+	    the_date=${year}-${month}-${day}
+	    date -d "${the_date}" "+%Y/%m/%d/${the_clock}@${template_name}@${attribute}" || {
+		echo "Could not read the time of a previous backup"
+		echo "Please email the author"
+		unlock_destination
+		exit 1
+	    }
+	done | egrep "@.*@${grep_value}" | sort -r | ${sort} | tail -${last_number}
+    )
 }
 
 
 handle_last_unfinished()
 {
-    if test -e $backup_destination/unfinished_backup/*; then
+    if test -e ${tmpdir}/unfinished_backup/*; then
 	echo
 	echo "WARNING: Last backup did not complete"
 	echo "  This unfinished backup is now removed"
 	echo
-	chmod -R u+w "$backup_destination/unfinished_backup"
-	rm -rf "$backup_destination/unfinished_backup"
+	chmod -R u+w "${tmpdir}/unfinished_backup"
+	rm -rf "${tmpdir}/unfinished_backup"
     fi
 }
 
 
 make_hard-link_copy_of_last_backup()
 {
-    last_backup=$(find $backup_destination -maxdepth 4 -mindepth 4 | sort | tail -1)
-    if test x$last_backup != x ; then
+    last_backup=$(find ${backup_destination} -maxdepth 4 -mindepth 4 | sort | tail -1)
+    if test x${last_backup} != x ; then
 	echo "Making a hard-link replication of the last backup"
-	echo "  ($last_backup)"
-	if test "x$dryrun" == "xno"; then
-	    mkdir -p "$backup_destination/unfinished_backup/$this_backup" || {
+	echo "  (${last_backup})"
+	if test "x${dryrun}" == "xno"; then
+	    mkdir -p "${tmpdir}/unfinished_backup/${this_backup}" || {
 		unlock_destination
 		exit 1
 	    }
-	    cp -lR "$last_backup/"* "$backup_destination/unfinished_backup/$this_backup" >/dev/null 2>&1 || echo "    WARNING: The last backup had NO files!"
+	    cp -lR "${last_backup}/"* "${tmpdir}/unfinished_backup/${this_backup}" >/dev/null 2>&1 || {
+		echo "    WARNING: The last backup had NO files!"
+		echo "             Or tmpdir is not on the same volume as destination"
+	    }
 	fi
 	first="no"
     else
 	echo "No previous backup detected, will start with an empty replication"
-	if test "x$dryrun" == "xno"; then
-	    mkdir -p $backup_destination/unfinished_backup/$this_backup || {
+	if test "x${dryrun}" == "xno"; then
+	    mkdir -p "${tmpdir}/unfinished_backup/$this_backup" || {
 		unlock_destination
 		exit 1
 	    }
@@ -291,14 +293,14 @@ moving_complete_backup_into_archive()
 {
     echo
     echo "Moving the complete backup into the backup archive"
-    echo "  ($backup_destination/unfinished_backup -> $backup_destination/"
+    echo "  ($tmpdir/unfinished_backup -> $backup_destination/)"
     
     if test "x$dryrun" == "xno"; then
 	mkdir -p "$backup_destination/$this_backup" || {
 	    unlock_destination
 	    exit 1
 	}
-	mv "$backup_destination/unfinished_backup/$this_backup/"* "$backup_destination/$this_backup/" || {
+	mv "$tmpdir/unfinished_backup/$this_backup/"* "$backup_destination/$this_backup/" || {
 	    unlock_destination
 	    exit 1
 	}
@@ -334,27 +336,28 @@ make_backup()
 	echo "Backing up by modifying the replication"
     fi
 
-    for dir in $backup_dirs ; do
+    for dir in ${backup_dirs} ; do
 	dir_wo_user=$(echo "$dir" | cut -f2- -d'@')
 	echo "  ${dir_wo_user}"
 	hostname=$(echo "$dir" | cut -f2- -d'@' | cut -f1 -d':')":"
 	userhost=$(echo "$dir" | cut -f1 -d':')
-	
+
 	if test "x$hostname" == "x$(hostname):"; then
 	    # remove hostname from dir to speed up local backup
 	    dir=$(echo "$dir" | cut -f2 -d':')
 	fi
 
 	if test "x$dryrun" == "xno"; then
-	    mkdir -p "$backup_destination/unfinished_backup/$this_backup/$hostname"
-	    rsync ${rsync_options} -e "ssh -p $port" "${dir}" "${backup_destination}/unfinished_backup/$this_backup/${hostname}" 2>&1 >/tmp/bontmia_rsync_output.$$ || {
+	    mkdir -p "$tmpdir/unfinished_backup/$this_backup/$hostname"
+
+	    rsync ${rsync_options} -e "ssh -p $port" "${dir}" "${tmpdir}/unfinished_backup/$this_backup/${hostname}" 2>&1 >/tmp/bontmia_rsync_output.$$ || {
 		echo
 		echo "  Caught an error doing rsync (return code $?)"
 		echo "  The last 10 lines of output from rsync:"
 		tail -10 /tmp/bontmia_rsync_output.$$
 		echo
 		echo "  Retrying rsync..."
-		rsync ${rsync_options} "${dir}" -e "ssh -p $port" "${backup_destination}/unfinished_backup/$this_backup/${hostname}" 2>&1 >/tmp/bontmia_rsync_output.$$.2 || {
+		rsync ${rsync_options} -e "ssh -p $port" "${dir}" "${tmpdir}/unfinished_backup/$this_backup/${hostname}" 2>&1 >/tmp/bontmia_rsync_output.$$ || {
 		    echo
 		    echo "  Still no luck.  Rsync failed with returncode $?"
 		    echo "  $dir"
@@ -371,13 +374,13 @@ make_backup()
 	fi
     done
     
-    delete_outside_sync "${backup_destination}/unfinished_backup/$this_backup/"
+    delete_outside_sync "${tmpdir}/unfinished_backup/$this_backup/"
     
     moving_complete_backup_into_archive
 
     if test "x$dryrun" == "xno"; then
-	chmod -R u+w $backup_destination/unfinished_backup
-	rm -rf "$backup_destination/unfinished_backup"
+	chmod -R u+w ${tmpdir}/unfinished_backup
+	rm -rf "$tmpdir/unfinished_backup"
     fi
 }
 
@@ -386,6 +389,7 @@ delete_old_backup()
 {
     echo
     echo "Calculates which backups to save"
+    echo "($filter_minutes minutes, $filter_hours hours, $filter_days days, $filter_weeks weeks, $filter_monthly months, $filter_years years)"
 
     # by saving the x last, the backups will not be deleted even if no
     # new backups is created
@@ -411,24 +415,11 @@ delete_old_backup()
 		filter_template "" "" "$filter_days" "-u -k 1,3 -t /" "days"
 	    fi
 
-#	    if ! test "0$filter_sundays" -ge 0 2>/dev/null; then
-#		print_usage
-#	    else
-#		filter_template "%A" "Sunday" "$filter_sundays" "-u -k 1,3 -t /" "weeks"
-#	    fi
-
 	    if ! test "0$filter_weeks" -ge 0 2>/dev/null; then
 		print_usage
 	    else
 		filter_template "%Y-%V" "" "$filter_weeks" "-u -k 3 -t @" "weeks"
 	    fi
-
-
-#	    if ! test "0$filter_firstofmonth" -ge 0 2>/dev/null; then
-#		print_usage
-#	    else
-#		filter_template "%d" "01" "$filter_firstofmonth" "-u -k 1,3 -t /" "month"
-#	    fi
 
 	    if ! test "0$filter_monthly" -ge 0 2>/dev/null; then
 		print_usage
@@ -445,21 +436,23 @@ delete_old_backup()
     
     archives_to_save=$(echo "$archives_with_filter" | cut -f1 -d'@' | sort -u)
 
-    cd ${backup_destination}
-    for archive in */*/*/*; do
-	if ! echo "${archives_to_save}" | grep "^${archive}$" >/dev/null; then
-	    echo "  Removing ${backup_destination}/$archive"
-	    if test "x$dryrun" == "xno"; then
-		chmod -R u+w ${archive}
-		rm -rf ${archive}
-		rmdir -p $(echo ${archive} | cut -f1-3 -d'/') 2>/dev/null
+    (
+	cd ${backup_destination}
+	for archive in */*/*/*; do
+	    if ! echo "${archives_to_save}" | grep "^${archive}$" >/dev/null; then
+		echo "  Removing ${backup_destination}/$archive"
+		if test "x$dryrun" == "xno"; then
+		    chmod -R u+w ${archive}
+		    rm -rf ${archive}
+		    rmdir -p $(echo ${archive} | cut -f1-3 -d'/') 2>/dev/null
+		fi
+	    else
+		echo -n "  Saving ${backup_destination}/$archive by filters:  "
+		filters=$(echo "$archives_with_filter" | grep "${archive}" | cut -f2 -d'@')
+		echo $filters
 	    fi
-	else
-	    echo -n "  Saving ${backup_destination}/$archive by filters:  "
-	    filters=$(echo "$archives_with_filter" | grep "${archive}" | cut -f2 -d'@')
-	    echo $filters
-	fi
-    done
+	done
+    )
 }
 
 
@@ -467,22 +460,23 @@ delete_outside_sync()
 {
     # Since we do a copy from last sync with cp -l, we have to
     # remove the extras here
+
     echo
     echo "Deletes files that should not be in the latest snapshot"
     if test "x$dryrun" == "xno"; then
-	cd $1
-#    cd $(find $backup_destination -maxdepth 4 -mindepth 4 | sort | tail -1)
-	IFS='
+	(
+	    cd $1
+	    IFS='
 '
-	for f in $(find -mindepth 1 -depth | egrep -v "$bdirmatch"); do
-	#echo "testing $f"
-	    if test -e "$f" ||
-		test -h "$f"; then
-		rmdir "$f" 2>/dev/null
-		rm -f "$f" 2>/dev/null
-	    fi
-	done
-	unset IFS
+	    for f in $(find -mindepth 1 -depth | egrep -v "$bdirmatch"); do
+		if test -e "$f" ||
+		    test -h "$f"; then
+		    rmdir "$f" 2>/dev/null
+		    rm -f "$f" 2>/dev/null
+		fi
+	    done
+	    unset IFS
+	)
     fi
 }
 
@@ -598,8 +592,6 @@ current_dir=$(pwd)
 filter_minutes="3"
 filter_hours="24"
 filter_days="7"
-#filter_sundays="4"
-#filter_firstofmonth="12"
 filter_weeks="4"
 filter_monthly="12"
 filter_years="0"
@@ -646,8 +638,11 @@ print "years:$6\n";
 	    shift
 	    bwlimit="--bwlimit=$1"
 	    shift;;
-	( "--compression" )
+	( "--temp" )
 	    shift
+	    tmpdir="$1"
+	    shift;;
+	( "--compression" )
 	    compression="-z"
 	    shift;;
 	( "--dest" )
@@ -700,7 +695,7 @@ done
 
 check_for_programs
 
-tmpdir="$backup_destination"
+tmpdir=${tmpdir:-"$backup_destination"}
 rsync_options="-azv -T $tmpdir --force --relative --hard-links --delete $bwlimit" # --stats"
 
 # to speed up checking for files outside the backup areas
@@ -728,6 +723,8 @@ bdirmatch=$(
     done
     echo -n ")"
 )
+
+echo "bdirmatch: $bdirmatch"
 
 lock_destination
 
