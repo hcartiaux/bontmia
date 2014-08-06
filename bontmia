@@ -11,11 +11,11 @@
 
 print_usage()
 {
-    cat <<EOF
+    cat <<EOF | more
 
 NAME
         Bontmia - Backup Over Network To Multiple Incremental Archives
-        Version 0.9
+        Version 0.10
 
 SYNOPSIS
         bontmia --dest <dest. dir> [options] [--source <source dirs>]
@@ -26,20 +26,29 @@ DESCRIPTION
         Each backup is a complete snapshot of the original
         directories.  Only new and changed files are copied over the
         network when generating a snapshot.  Remote access is
-        implemented using ssh.  Unchanged files are stored as hard
-        links in the archive and therefore takes virtually no space.
+        implemented securely using ssh.  Unchanged files are stored as
+        hard links in the archive and therefore takes virtually no
+        space.
 
-        The backups is stored in a directory structure like
+        The backups is stored in a directory structure in the format
         YYYY/MM/DD/HH:MM.  Each directory contains a snapshot of the
-        filesystem.  This is stored incrementally by letting every
-        file not changed between backups be a hard link to the same
-        file in the previous backup.  The actual copying is done with
-        rsync.  To avoid typing inn a password you do as usual with
-        ssh.  Which backup to store for how long is configurable.
+        backed up directories.  This is stored incrementally by
+        letting every file not changed between backups be a hard link
+        to the same file in the previous backup.  The actual copying
+        is done with rsync.  To avoid typing inn a password you do as
+        usual with ssh by generating a public key on the host where
+        the backup is stored, read the manual page for ssh, and adding
+        this to the list of authorized hosts on the remote computer,
+        read the manual page for sshd.
+
+        Which backup to store for how long is configurable, see below.
+
+        The return value is 0 on success and 1 if backing up one of
+        the sources failed.
 
         The destination can not be remote.  If you want to place the
         backup on a remote server, then run Bontmia as a command with
-        ssh.
+        ssh like "ssh user@host.domain bontmia <options>".
 
         Use at your own risk.
 
@@ -52,34 +61,24 @@ ARGUMENTS
 
 OPTIONS
         --source <dir|foo:dir|bar@baz:dir>
-                Sets the source directories to backup.  The foo:/dir
-                and bar@baz:/dir notation is for accessing a remote
+                Sets the source directories to backup.  The foo:dir
+                and bar@baz:dir notation is for accessing a remote
                 host by ssh.
 
         -d      Will remove old backups but some selected ones.
-                Default is to store the 3 last backups with one per
-                minute, 24 last backups with one per hour, 7 last
-                backups with one per day, 4 last Sundays with one per
-                day, 12 last first of month with one per day and 2
-                last of friday the 13th.  This default values can be
-                changed by other options.
+                See below for the default number of backups to
+                save and how to change them.
 
         --bwlimit <number>
-                This option allows you to specify a maximum transfer
-                rate in kilobytes per second. This option is most
-                effective when using rsync with large files (several
-                megabytes and up). Due to the nature of rsync
+                Specifies a maximum transfer rate in kilobytes per
+                second. This option is most effective with large files
+                (several megabytes and up). Due to the nature of rsync
                 transfers, blocks of data are sent, then if rsync
                 determines the transfer was too fast, it will wait
                 before sending the next data block. The result is an
                 average transfer rate equalling the specified limit. A
-                value of zero specifies no limit.
-
-        --tmpdir <tempdir>
-                Specifies where files should be stored temporarily
-                before moved to the backup directory.  The default is
-                /tmp.  For better performance one should use a
-                directory on the same physical volume as the backup
+                value of zero specifies no limit.  The default is no
+                limit.
 
         --minutes <number>
                 Sets the number of backups to save with one per unique
@@ -96,14 +95,16 @@ OPTIONS
                 day is saved.
 
         --sundays <number>
-                Sets the number of backups to save with one per unique
-                Sunday. The default is 4.  The latest backup within the
-                Sunday is saved.
+                This is used as weekly backup.  It sets the number
+                of backups to save with one per unique Sunday. The
+                default is 4.  The latest backup within the Sunday is
+                saved.
 
         --firstofmonth <number>
-                Sets the number of backups to save with one per unique
-                first of month. The default is 12.  The latest backup
-                within the firstofmonth is saved.
+                This is used as monthly backup.  Sets the number of
+                backups to save with one per unique first of
+                month. The default is 12.  The latest backup within
+                the first of month is saved.
 
         --friday13th <number>
                 Sets the number of backups to save with one per unique
@@ -116,21 +117,22 @@ EXAMPLES
                 --sundays 0 --firstofmonth 0 --source foo@bar:/baz/zoot
 
         Here there is made a copy of foo@bar:/baz/zoot in the
-        directory backup.  If this command is run every minute, there
-        is store one backup for every minute for the last 5 minutes.
-        If it is run once every day.  There is still stored the last 5
-        backups done at unique minutes so the last 5 backups is stored.
+        directory backup on the local host.  If this command is run
+        every minute, there is store one backup for every minute for
+        the last 5 minutes.  If it is run once every day.  There is
+        still stored the last 5 backups done at unique minutes so the
+        last 5 backups is stored which means 5 last days.
 
         Hint: set the values for times shorter than the interval used
-              when doing backup to 1 or 0.
+              when doing backup to 0.
 
 
         bontmia -d --dest ./backup --minutes 0 --hours 0 \\
                 --source foo@bar:/baz/zoot
 
         Here there will at the most be stored 7 + 4 + 12 backups
-        (minus eventually overlap between the backups).  This can be a
-        good command to run nightly.
+        (minus overlap between the backups).  This can be a good
+        command to run nightly.
 
 
         bontmia -d --minutes 0 --dest backup
@@ -147,11 +149,16 @@ EXAMPLES
         This backs up but does not care about deleting old backups
         since there is no -d option.
 
+
+        When bontmia runs it sends output to standard output.  If you
+        do not want this you can redirect it to /dev/null.
+
 CONTACT
         Bontmia was written in april 2003 by John Enok Vollestad
         <john.enok@vollestad.no> to merge the functionality of
         glastree and rsync in one application with a more flexible
-        selection of long term storage.  http://folk.uio.no/johnen/
+        selection of long term storage.
+        http://folk.uio.no/johnen/bontmia/
 
 EOF
     exit 1
@@ -215,17 +222,27 @@ make_backup()
 	    hostname=""
 	fi
 	mkdir -p "$backup_destination/$this_backup/$dir_wo_user"
-	#echo "rsync ${rsync_options} ${dir} ${backup_destination}/${this_backup}/${hostname}"
-	rsync ${rsync_options} ${dir} ${backup_destination}/${this_backup}/${hostname} || {
+	tenlast=$(rsync ${rsync_options} ${dir} ${backup_destination}/${this_backup}/${hostname} 2>&1 | tail -10) || {
 	    echo
-	    echo "      Caught an error in rsync, retrying.."
-	    rsync $rsync_options "$dir" "$backup_destination/$this_backup"
+	    echo "      Caught an error doing rsync."
+	    echo "      The last 10 lines of output from rsync:"
+	    echo "$tenlast"
+	    echo
+	    echo "      Retrying..."
+	    tenlast=$(rsync $rsync_options "$dir" "$backup_destination/$this_backup" 2>&1 | tail -10)
 	} || {
 	    echo
-	    echo "      Still no luck.  Rsync failed!"
-	    echo "Please check that there is room on the temp device for"
-	    echo "the largest file to be copied."
-	    exit 1
+	    echo "      Still no luck.  Rsync failed while trying to backup"
+	    echo "      $dir."
+	    echo "      Please check that there is room for all the data +"
+	    echo "      the size of the largest file to be copied."
+	    echo "      The last 10 lines of output from rsync:"
+	    echo "$tenlast"
+	    echo
+	    echo
+	    echo "      Continuing with the next backup source"
+	    echo
+	    exit_status="1"
 	}
     done
 }
@@ -236,15 +253,14 @@ delete_old_backup()
     echo
     echo "  Deleting old backups"
 
-    # by saving the x last, the backups will not be deleted if no new
-    # backups is created
+    # by saving the x last, the backups will not be deleted even if no
+    # new backups is created
 
     archives_to_save=$( (
 
 	    if ! test "0$filter_minutes" -ge 0 2>/dev/null; then
 		print_usage
 	    else
-		#filter_template "" "" "$filter_minutes" "-u --key=1,2 -t :"
 		filter_template "" "" "$filter_minutes" "-u"
 	    fi
 
@@ -377,11 +393,10 @@ filter_sundays="4"
 filter_firstofmonth="12"
 filter_friday13th="0"
 bwlimit=""
-tmpdir="/tmp"
-
-
-
+backup_dirs=""
+exit_status="0"
 do_del_old="no"
+
 while test "x$*" != x; do
     case "$1" in 
 	( "--minutes" )
@@ -412,14 +427,6 @@ while test "x$*" != x; do
 	    shift
 	    bwlimit="--bwlimit=$1"
 	    shift;;
-	( "--tmpdir" )
-	    shift;
-	    tmpdir="$(knead_dest_path "$1")";
-	    if ! test -d "$1"; then
-		echo "temp dir $tmpdir does not exist or is not a directory"
-		exit 1
-	    fi
-	    shift;;
 	( "-d" )
 	    do_del_old="yes";
 	    shift;;
@@ -427,14 +434,14 @@ while test "x$*" != x; do
 	    shift;
 	    backup_destination="$(knead_dest_path "$1")";
 	    if ! test -d "$1"; then
-		echo "destination dir $backup_destination does not exist or is not a directory"
+		echo "Destination dir $backup_destination does not exist or is not a directory"
 		exit 1
 	    fi
 	    shift;;
 	( "--source" )
 	    shift
 	    if test "x$1" == "x"; then
-		echo "missing source directories"
+		echo "Missing source directories"
 		exit 1
 	    fi
 	    backup_dirs=""
@@ -468,8 +475,9 @@ while test "x$*" != x; do
 done
 
 
-rsync_options="-az -T $tmpdir --force --relative -e ssh --hard-links --delete $bwlimit" # --stats"
+tmpdir="$backup_destination"
 
+rsync_options="-azv -T $tmpdir --force --relative -e ssh --hard-links --delete $bwlimit" # --stats"
 
 # to speed up checking for files outside the backup areas
 bdirmatch=$(
@@ -500,10 +508,11 @@ bdirmatch=$(
 
 if test "x$backup_dirs" != x; then
     make_backup
-    #delete_outside_sync
+    delete_outside_sync
 fi
 
 if test "x$do_del_old" == xyes; then
     delete_old_backup
 fi
 
+exit $exit_status
