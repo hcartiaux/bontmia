@@ -206,7 +206,7 @@ output_rsync_stats()
     echo ""
     echo "Rsync statistics"
     echo ""
-    cat /tmp/bontmia_rsync_output.$$ | sed -n '/^Number of files: [0-9]*$/,/^total size is$/p'
+    cat /tmp/bontmia_rsync_output.$$ | tail -n 16 | head -n 13
 }
 
 lock_destination()
