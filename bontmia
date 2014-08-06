@@ -550,7 +550,6 @@ check_for_programs()
         unlock_destination
         exit 1
     }
-    check_program cp
     touch /tmp/bontmia_test_cp_file.$$ || {
         echo "Could not create a temporary file on /tmp"
         echo "Please make sure that /tmp is writable"
