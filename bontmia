@@ -15,7 +15,7 @@ print_usage()
 
 NAME
         Bontmia - Backup Over Network To Multiple Incremental Archives
-        Version 0.10
+        Version 0.11
 
 SYNOPSIS
         bontmia --dest <dest. dir> [options] [--source <source dirs>]
@@ -157,11 +157,23 @@ CONTACT
         Bontmia was written in april 2003 by John Enok Vollestad
         <john.enok@vollestad.no> to merge the functionality of
         glastree and rsync in one application with a more flexible
-        selection of long term storage.
-        http://folk.uio.no/johnen/bontmia/
+        selection of long term storage.  It has later undergone some
+        bugfixes and enhancements. http://folk.uio.no/johnen/bontmia/
 
 EOF
     exit 1
+}
+
+
+full_name() {
+    host="$1";
+    if host $host | grep "domain name pointer" >/dev/null; then
+	host $host | cut -f5 -d' ' | sed -e 's/\.$//';
+    else
+	if host $host | grep "has address" >/dev/null; then
+	    full_name $(host $host | grep "has address" | cut -f4 -d' ');
+	fi;
+    fi;
 }
 
 
@@ -191,67 +203,103 @@ filter_template()
 }
 
 
+handle_last_unfinished()
+{
+    if test -e $backup_destination/unfinished_backup/*; then
+	echo
+	echo "WARNING: Last backup did not complete."
+	echo "  This unfinished backup is now removed."
+	echo
+    fi
+    rm -rf $backup_destination/unfinished_backup
+}
+
+
+make_hard-link_copy_of_last_backup()
+{
+    last_backup=$(find $backup_destination -maxdepth 4 -mindepth 4 | sort | tail -1)
+    if test x$last_backup != x ; then
+	mkdir -p $backup_destination/unfinished_backup/$this_backup || exit 1
+	echo "Making a hard-link replication of the last backup"
+	echo "  ($last_backup)"
+	cp -lR $last_backup/* $backup_destination/unfinished_backup/$this_backup
+	first="no"
+    else
+	mkdir -p $backup_destination/unfinished_backup/$this_backup || exit 1
+	echo "No previous backup detected, will start with an empty replication"
+	first="yes"
+    fi
+}
+
+moving_complete_backup_into_archive()
+{
+    mkdir -p "$backup_destination/$this_backup" || exit 1
+    echo
+    echo "Moving the complete backup into the backup archive"
+    echo "  ($backup_destination/unfinished_backup -> $backup_destination/"
+    
+    mv $backup_destination/unfinished_backup/$this_backup/* $backup_destination/$this_backup/ || exit 1
+}
+
 make_backup()
 {
     this_backup=$(date +%Y)/$(date +%m)/$(date +%d)/$(date +%H\:%M)
+
+    handle_last_unfinished
+    make_hard-link_copy_of_last_backup
+
+    # Apply changes to the hard-link copy
     echo
-    echo "  Backing up to $backup_destination/$this_backup"
-
-    cd "$current_dir"
-    mkdir -p "$backup_destination" || exit 1
-
-    # Make a hard-link copy of the last backup
-    last_backup=$(find $backup_destination -maxdepth 4 -mindepth 4 | sort | tail -1)
-    if test x$last_backup != x ; then
-	mkdir -p $backup_destination/$this_backup || exit 1
-	echo "    Making a hard-link replication of the last backup"
-	echo "      ($last_backup)"
-	cp -lR $last_backup/* $backup_destination/$this_backup
+    if test "x$first" == "xyes"; then
+	echo "Backing up."
     else
-	echo "    No previous backup detected, will start with an empty replication"
-	mkdir -p $backup_destination/$this_backup || exit 1
+	echo "Backing up by modifying the replication."
     fi
-
-    # Apply changes from the backup directories
     for dir in $backup_dirs ; do
 	dir_wo_user=$(echo "$dir" | cut -f2- -d'@')
-	echo "    Backing up $dir_wo_user by modifying the replication"
-	if echo "$dir" | grep ":" >/dev/null; then
-	    hostname=$(echo -n "$dir" | cut -f2- -d'@' | cut -f1 -d':')":"
-	else
-	    hostname=""
+	echo "  ${dir_wo_user}"
+	hostname=$(echo -n "$dir" | cut -f2- -d'@' | cut -f1 -d':')":"
+	
+	if test "x$hostname" == "x$(hostname):"; then
+	    # remove hostname from dir to speed up local backup
+	    dir=$(echo "$dir" | cut -f2 -d':')
 	fi
-	mkdir -p "$backup_destination/$this_backup/$dir_wo_user"
-	tenlast=$(rsync ${rsync_options} ${dir} ${backup_destination}/${this_backup}/${hostname} 2>&1 | tail -10) || {
+
+	mkdir -p "$backup_destination/unfinished_backup/$this_backup/$hostname"
+	tenlast=$(rsync ${rsync_options} "${dir}" "${backup_destination}/unfinished_backup/$this_backup/${hostname}" 2>&1 | tail -10) || {
 	    echo
-	    echo "      Caught an error doing rsync."
-	    echo "      The last 10 lines of output from rsync:"
+	    echo "  Caught an error doing rsync."
+	    echo "  The last 10 lines of output from rsync:"
 	    echo "$tenlast"
 	    echo
-	    echo "      Retrying..."
-	    tenlast=$(rsync $rsync_options "$dir" "$backup_destination/$this_backup" 2>&1 | tail -10)
-	} || {
-	    echo
-	    echo "      Still no luck.  Rsync failed while trying to backup"
-	    echo "      $dir."
-	    echo "      Please check that there is room for all the data +"
-	    echo "      the size of the largest file to be copied."
-	    echo "      The last 10 lines of output from rsync:"
-	    echo "$tenlast"
-	    echo
-	    echo
-	    echo "      Continuing with the next backup source"
-	    echo
-	    exit_status="1"
+	    echo "  Retrying rsync..."
+	    tenlast=$(rsync ${rsync_options} "${dir}" "${backup_destination}/unfinished_backup/$this_backup/${hostname}" 2>&1 | tail -10) || {
+		echo
+		echo "  Still no luck.  Rsync failed while trying to backup"
+		echo "  $dir."
+		echo "  Please check that there is room for all the data."
+		echo "  The last 10 lines of output from rsync:"
+		echo "$tenlast"
+		echo
+		echo
+		echo "  Continuing with the next backup source"
+		echo
+		exit_status="1"
+	    }
 	}
     done
+    
+    delete_outside_sync "${backup_destination}/unfinished_backup/$this_backup/"
+    
+    moving_complete_backup_into_archive
+    rm -rf $backup_destination/unfinished_backup
 }
 
 
 delete_old_backup()
 {
     echo
-    echo "  Deleting old backups"
+    echo "Deleting old backups"
 
     # by saving the x last, the backups will not be deleted even if no
     # new backups is created
@@ -299,11 +347,11 @@ delete_old_backup()
     cd ${backup_destination}
     for archive in */*/*/*; do
 	if ! echo "${archives_to_save}" | grep "^${archive}$" >/dev/null; then
-	    echo "    Removing ${backup_destination}/$archive"
+	    echo "  Removing ${backup_destination}/$archive"
 	    rm -rf ${archive}
 	    rmdir -p $(echo ${archive} | cut -f1-3 -d'/') 2>/dev/null
 	else
-	    echo "    Saving ${backup_destination}/$archive for now"
+	    echo "  Saving ${backup_destination}/$archive for now"
 	fi
     done
 }
@@ -313,9 +361,10 @@ delete_outside_sync()
 {
     # Since we do a copy from last sync with cp -l, we have to
     # remove the extras here
-    echo "    Deletes files that should not be in the latest snapshot"
-    cd "$current_dir"
-    cd $(find $backup_destination -maxdepth 4 -mindepth 4 | sort | tail -1)
+    echo
+    echo "Deletes files that should not be in the latest snapshot"
+    cd $1
+#    cd $(find $backup_destination -maxdepth 4 -mindepth 4 | sort | tail -1)
     IFS='
 '
     for f in $(find -mindepth 1 -depth | egrep -v "$bdirmatch"); do
@@ -448,7 +497,8 @@ while test "x$*" != x; do
 	    while test "x$*" != x; do
 		dir="$1"
 		if ! echo "$dir" | grep ":" >/dev/null; then
-		    dir="$(knead_source_path "$dir")"
+		    remotehost="$(hostname)"
+		    dir="$remotehost:$(knead_source_path "$dir")"
 		else
 		    backuppath="$(echo "$dir" | cut -f2- -d':')"
 		    if echo "$dir" | grep "@" >/dev/null; then
@@ -458,11 +508,15 @@ while test "x$*" != x; do
 			remotehost=$(echo "$dir" | cut -f1 -d':')
 			remoteuser="$(whoami)"
 		    fi
+
+		    remotehost=$(full_name $remotehost)
+
 		    if echo "$dir" | cut -f2- -d':' | grep "^/" >/dev/null; then
 			abolutepart=""
 		    else
 			absolutepart=$(ssh $remotehost pwd)"/"
 		    fi
+	
 		    dir="$remoteuser@$remotehost:$absolutepart$backuppath"
 		fi
 		backup_dirs="$backup_dirs $(knead_source_path "$dir")"
@@ -508,7 +562,6 @@ bdirmatch=$(
 
 if test "x$backup_dirs" != x; then
     make_backup
-    delete_outside_sync
 fi
 
 if test "x$do_del_old" == xyes; then
