@@ -8,9 +8,6 @@
 #
 # Written by John Enok Vollestad in April 2003 and have later
 # undergone some bugfixes and enhancements.
-#
-# Bugfixes and enhancements:
-# Copyright (c) 2012 Marcel Pennewiss (opensource@pennewiss.de)
 
 print_usage()
 {
@@ -285,36 +282,6 @@ handle_last_unfinished()
 }
 
 
-make_hard-link_copy_of_last_backup()
-{
-    last_backup=$(find ${backup_destination} -maxdepth 4 -mindepth 4 | sort | tail -1)
-    if test x${last_backup} != x ; then
-        echo "Making a hard-link replication of the last backup"
-        echo "  (${last_backup})"
-        if test "x${dryrun}" == "xno"; then
-            mkdir -p "${tmpdir}/unfinished_backup/${this_backup}" || {
-                unlock_destination
-                exit 1
-            }
-            cp -lR "${last_backup}/"* "${tmpdir}/unfinished_backup/${this_backup}" >/dev/null 2>&1 || {
-                echo "    WARNING: The last backup had NO files!"
-                echo "             Or tmpdir is not on the same volume as destination"
-            }
-        fi
-        first="no"
-    else
-        echo "No previous backup detected, will start with an empty replication"
-        if test "x${dryrun}" == "xno"; then
-            mkdir -p "${tmpdir}/unfinished_backup/$this_backup" || {
-                unlock_destination
-                exit 1
-            }
-        fi
-        first="yes"
-    fi
-}
-
-
 moving_complete_backup_into_archive()
 {
     echo
@@ -352,14 +319,33 @@ make_backup()
     do_the_backup_exist "$this_backup"
 
     handle_last_unfinished
-    make_hard-link_copy_of_last_backup
 
-    # Apply changes to the hard-link copy
-    echo
-    if test "x$first" == "xyes"; then
-        echo "Backing up"
+    if test "x`stat -c %d ${backup_destination}`" != "x`stat -c %d ${tmpdir}`" ; then
+        echo "tmpdir is not on the same volume as destination"
+        unlock_destination
+        exit 1
+    fi
+
+    last_backup=$(find ${backup_destination} -maxdepth 4 -mindepth 4 | sort | tail -1)
+    if test "x${last_backup}" != "x" ; then
+        echo "Hardlink to files in last backup when unchanged"
+        echo "  (${last_backup})"
+        if test "x${dryrun}" == "xno"; then
+            mkdir -p "${tmpdir}/unfinished_backup/${this_backup}" || {
+                unlock_destination
+                exit 1
+            }
+            first="no"
+        fi
     else
-        echo "Backing up by modifying the replication"
+        echo "No previous backup detected, will start with an empty replication"
+        if test "x${dryrun}" == "xno"; then
+            mkdir -p "${tmpdir}/unfinished_backup/$this_backup" || {
+                unlock_destination
+                exit 1
+            }
+            first="yes"
+        fi
     fi
 
     for dir in ${backup_dirs} ; do
@@ -371,6 +357,10 @@ make_backup()
         if test "x$hostname" == "x$(hostname):"; then
             # remove hostname from dir to speed up local backup
             dir=$(echo "$dir" | cut -f2 -d':')
+        fi
+        if test "x${last_backup}" != "x" ; then
+            # set the link-dest parameter to the last backup
+            rsync_options="${rsync_options} --link-dest=${last_backup}/${hostname}/"
         fi
 
         if test "x$dryrun" == "xno"; then
@@ -399,8 +389,6 @@ make_backup()
             }
         fi
     done
-
-    delete_outside_sync "${tmpdir}/unfinished_backup/$this_backup/"
 
     moving_complete_backup_into_archive
 
@@ -479,31 +467,6 @@ delete_old_backup()
         fi
     done
     )
-}
-
-
-delete_outside_sync()
-{
-    # Since we do a copy from last sync with cp -l, we have to
-    # remove the extras here
-
-    echo
-    echo "Deletes files that should not be in the latest snapshot"
-    if test "x$dryrun" == "xno"; then
-        (
-        cd $1
-        IFS='
-'
-        for f in $(find -mindepth 1 -depth | egrep -v "$bdirmatch"); do
-            if test -e "$f" ||
-                test -h "$f"; then
-                rmdir "$f" 2>/dev/null
-                rm -f "$f" 2>/dev/null
-            fi
-        done
-        unset IFS
-        )
-    fi
 }
 
 
@@ -591,13 +554,6 @@ check_for_programs()
     touch /tmp/bontmia_test_cp_file.$$ || {
         echo "Could not create a temporary file on /tmp"
         echo "Please make sure that /tmp is writable"
-        echo "Aborting"
-        unlock_destination
-        exit 1
-    }
-    cp -l /tmp/bontmia_test_cp_file.$$ /tmp/bontmia_test_cp_file.$$.2 >/dev/null 2>&1 || {
-        echo "cp on your system does not support the -l option"
-        echo "You might not have the GNU version of 'cp'"
         echo "Aborting"
         unlock_destination
         exit 1
