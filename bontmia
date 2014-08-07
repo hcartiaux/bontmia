@@ -6,8 +6,15 @@
 # available to use towards remote hosts and having a selective long
 # term storage.
 #
-# Written by John Enok Vollestad in April 2003 and have later
-# undergone some bugfixes and enhancements.
+# Original author:
+#   (c) 2003 John Enok Vollestad <john.enok@vollestad.no>
+#       http://folk.uio.no/johnen/bontmia/
+#
+# Bugfixes and enhancements:
+#   (c) 2012 Marcel Pennewiss    <opensource@pennewiss.de>
+#       https://github.com/mape2k/bontmia/
+#   (c) 2014 Hyacinthe Cartiaux  <hyacinthe.cartiaux@free.fr>
+#       https://github.com/hcartiaux/bontmia/
 
 print_usage()
 {
