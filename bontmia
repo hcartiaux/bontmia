@@ -190,9 +190,6 @@ CONTACT
         selection of long term storage.  It has later undergone some
         bugfixes and enhancements. http://folk.uio.no/johnen/bontmia/
 
-  Enhanced version will be available on
-  https://github.com/mape2k/bontmia
-
 EOF
     exit 1
 }
