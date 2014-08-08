@@ -608,11 +608,11 @@ print "years:$6\n";
     print_usage
 }
       filter_minutes=$(echo "$rotation" | grep minutes | cut -f2 -d':')
-      filter_hours=$(echo "$rotation" | grep hours | cut -f2 -d':')
-      filter_days=$(echo "$rotation" | grep days | cut -f2 -d':')
-      filter_weeks=$(echo "$rotation" | grep weeks | cut -f2 -d':')
-      filter_monthly=$(echo "$rotation" | grep month | cut -f2 -d':')
-      filter_years=$(echo "$rotation" | grep years | cut -f2 -d':')
+      filter_hours=$(  echo "$rotation" | grep hours   | cut -f2 -d':')
+      filter_days=$(   echo "$rotation" | grep days    | cut -f2 -d':')
+      filter_weeks=$(  echo "$rotation" | grep weeks   | cut -f2 -d':')
+      filter_monthly=$(echo "$rotation" | grep month   | cut -f2 -d':')
+      filter_years=$(  echo "$rotation" | grep years   | cut -f2 -d':')
       do_del_old="yes";
       shift;;
   ( "--port" )
@@ -670,7 +670,7 @@ print "years:$6\n";
                   remoteuser=$(echo "$dir" | cut -f1 -d':' | cut -f1 -d'@')
               else
                   remotehost=$(echo "$dir" | cut -f1 -d':')
-                  remoteuser="$(whoami)"
+                  remoteuser=$(whoami)
               fi
 
               if echo "$dir" | cut -f2- -d':' | grep "^/" >/dev/null; then
