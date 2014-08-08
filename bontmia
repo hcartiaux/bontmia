@@ -312,11 +312,6 @@ make_backup()
 
     handle_last_unfinished
 
-    if test "x`stat -c %d ${backup_destination}`" != "x`stat -c %d ${tmpdir}`" ; then
-        echo "tmpdir is not on the same volume as destination"
-        unlock_destination
-        exit 1
-    fi
 
     last_backup=$(find ${backup_destination} -maxdepth 4 -mindepth 4 | sort | tail -1)
     if test "x${last_backup}" != "x" ; then
@@ -521,9 +516,26 @@ check_program()
     }
 }
 
-
 check_for_programs()
 {
+    check_program ssh
+    check_program whoami
+    check_program perl
+    check_program host
+    check_program touch
+    check_program stat
+    check_program rm
+    check_program rmdir
+    check_program mkdir
+    check_program chmod
+    check_program cat
+    check_program cut
+    check_program sed
+    check_program sort
+    check_program grep
+    check_program egrep
+    check_program tail
+
     check_program rsync
     rsync --help | grep link-dest >/dev/null 2>/dev/null || {
         echo "'rsync' on your system does not support the 'link-dest' option"
@@ -532,9 +544,8 @@ check_for_programs()
         unlock_destination
         exit 1
     }
-    check_program host
-    check_program date
-    check_program perl
+
+    check_program find
     find /tmp -maxdepth 1 -mindepth 1 >/dev/null 2>/dev/null || {
         echo "'find' on your system does not support the '--maxdepth' and"
         echo "'--mindepth' options"
@@ -543,6 +554,8 @@ check_for_programs()
         unlock_destination
         exit 1
     }
+
+    check_program date
     date -d 20030303 >/dev/null 2>/dev/null || {
         echo "'date' on your system does not support the '--date' option"
         echo "You might not have the GNU version of 'date'"
@@ -550,19 +563,49 @@ check_for_programs()
         unlock_destination
         exit 1
     }
-    touch /tmp/bontmia_test_cp_file.$$ || {
+}
+
+check_system()
+{
+    if test "x`stat -c %d ${backup_destination}`" != "x`stat -c %d ${tmpdir}`" ; then
+        echo "tmpdir is not on the same volume as destination"
+        unlock_destination
+        exit 1
+    fi
+
+    touch /tmp/bontmia_test_file.$$ || {
         echo "Could not create a temporary file on /tmp"
         echo "Please make sure that /tmp is writable"
         echo "Aborting"
         unlock_destination
         exit 1
     }
-    rm -f /tmp/bontmia_test_cp_file.$$ /tmp/bontmia_test_cp_file.$$.2
+    rm -f /tmp/bontmia_test_file.$$
+
+    tmpfile=${tmpdir}/bontmia_test_file.$$
+    touch $tmpfile || {
+        echo "Could not create a temporary file on ${tmpdir}"
+        echo "Please make sure that ${tmpdir} is writable"
+        echo "Aborting"
+        unlock_destination
+        exit 1
+    }
+
+    ln ${tmpfile} ${tmpfile}.hardlink && rm -f ${tmpfile} ${tmpfile}.hardlink || {
+        rm -f ${tmpfile}
+        echo "Could not create a hard link on ${tmpdir}"
+        echo "Please make sure that the filesystem supports hard links"
+        echo "Aborting"
+        unlock_destination
+        exit 1
+    }
+    unset tmpfile
 }
 
 
 #################################################################
 
+check_for_programs
 
 if test "x$*" == x; then
     print_usage
@@ -647,6 +690,7 @@ print "years:$6\n";
   ( "--dest" )
       shift;
       backup_destination="$(knead_dest_path "$1")";
+      tmpdir=${tmpdir:-"$backup_destination"}
       if ! test -d "$1"; then
           echo "Destination dir $backup_destination does not exist or is not a directory"
           exit 1
@@ -690,9 +734,8 @@ print "years:$6\n";
     esac
 done
 
-check_for_programs
+check_system
 
-tmpdir=${tmpdir:-"$backup_destination"}
 rsync_options="-azv -T $tmpdir --force --relative --hard-links --delete $bwlimit $excludefrom $stats"
 
 # to speed up checking for files outside the backup areas
