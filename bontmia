@@ -546,6 +546,7 @@ check_for_programs()
     }
     check_program host
     check_program date
+    check_program perl
     find /tmp -maxdepth 1 -mindepth 1 >/dev/null 2>/dev/null || {
         echo "'find' on your system does not support the '--maxdepth' and"
         echo "'--mindepth' options"
