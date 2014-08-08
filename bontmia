@@ -537,6 +537,13 @@ check_program()
 check_for_programs()
 {
     check_program rsync
+    rsync --help | grep link-dest >/dev/null 2>/dev/null || {
+        echo "'rsync' on your system does not support the 'link-dest' option"
+        echo "Your rsync version might be too old"
+        echo "Aborting"
+        unlock_destination
+        exit 1
+    }
     check_program host
     check_program date
     find /tmp -maxdepth 1 -mindepth 1 >/dev/null 2>/dev/null || {
