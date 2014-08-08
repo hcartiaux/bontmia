@@ -227,18 +227,6 @@ lock_destination()
 }
 
 
-full_name() {
-    host="${1}";
-    if host ${host} | grep "domain name pointer" >/dev/null; then
-        host ${host} | cut -f5 -d' ' | sed -e 's/\.$//';
-    else
-        if host ${host} | grep "has address" >/dev/null; then
-            full_name $(host ${host} | grep "has address" | cut -f4 -d' ');
-        fi;
-    fi;
-}
-
-
 filter_template()
 {
     attribute="${1}"
@@ -684,8 +672,6 @@ print "years:$6\n";
                   remotehost=$(echo "$dir" | cut -f1 -d':')
                   remoteuser="$(whoami)"
               fi
-
-              #remotehost=$(full_name $remotehost)
 
               if echo "$dir" | cut -f2- -d':' | grep "^/" >/dev/null; then
                   abolutepart=""
