@@ -229,11 +229,11 @@ lock_destination()
 
 filter_template()
 {
-    attribute="${1}"
-    grep_value="${2}"
-    last_number="${3}"
-    sort_options="${4}"
-    template_name="${5}"
+    attribute="$1"
+    grep_value="$2"
+    last_number="$3"
+    sort_options="$4"
+    template_name="$5"
 
     if test "x${sort_options}" != x; then
         sort="sort ${sort_options}"
@@ -244,26 +244,26 @@ filter_template()
     (
         cd "${backup_destination}"
         for archive in */*/*/*; do
-            year=$(echo ${archive} | cut -f1 -d'/')
-            month=$(echo ${archive} | cut -f2 -d'/')
-            day=$(echo ${archive} | cut -f3 -d'/')
+            year=$(     echo ${archive} | cut -f1 -d'/')
+            month=$(    echo ${archive} | cut -f2 -d'/')
+            day=$(      echo ${archive} | cut -f3 -d'/')
             the_clock=$(echo ${archive} | cut -f4 -d'/')
 
-            the_date=${year}-${month}-${day}
+            the_date="${year}-${month}-${day}"
             date -d "${the_date}" "+%Y/%m/%d/${the_clock}@${template_name}@${attribute}" || {
                 echo "Could not read the time of a previous backup"
                 echo "Please email the author"
                 unlock_destination
                 exit 1
             }
-        done | egrep "@.*@${grep_value}" | sort -r | ${sort} | tail -${last_number}
+        done | egrep "@.*@${grep_value}" | sort -r | $sort | tail -$last_number
     )
 }
 
 
 handle_last_unfinished()
 {
-    if test -e ${tmpdir}/unfinished_backup/*; then
+    if test -e "${tmpdir}/unfinished_backup/*"; then
         echo
         echo "WARNING: Last backup did not complete"
         echo "  This unfinished backup is now removed"
@@ -306,14 +306,14 @@ do_the_backup_exist()
 
 make_backup()
 {
-    this_backup=$(date +%Y)/$(date +%m)/$(date +%d)/$(date +%H\:%M)
+    this_backup="$(date +%Y)/$(date +%m)/$(date +%d)/$(date +%H\:%M)"
 
     do_the_backup_exist "$this_backup"
 
     handle_last_unfinished
 
 
-    last_backup=$(find ${backup_destination} -maxdepth 4 -mindepth 4 | sort | tail -1)
+    last_backup=$(find "${backup_destination}" -maxdepth 4 -mindepth 4 | sort | tail -1)
     if test "x${last_backup}" != "x" ; then
         echo "Hardlink to files in last backup when unchanged"
         echo "  (${last_backup})"
@@ -335,32 +335,37 @@ make_backup()
         fi
     fi
 
-    for dir in ${backup_dirs} ; do
-        dir_wo_user=$(echo "$dir" | cut -f2- -d'@')
+    for dir in "${backup_dirs}" ; do
+        dir_wo_user=$(echo "${dir}" | cut -f2- -d'@')
         echo "  ${dir_wo_user}"
-        hostname=$(echo "$dir" | cut -f2- -d'@' | cut -f1 -d':')":"
-        userhost=$(echo "$dir" | cut -f1 -d':')
+        hostname=$(echo "${dir}" | cut -f2- -d'@' | cut -f1 -d':')":"
+        userhost=$(echo "${dir}" | cut -f1 -d':')
 
-        if test "x$hostname" == "x$(hostname):"; then
+        if test "x${hostname}" == "x$(hostname):"; then
             # remove hostname from dir to speed up local backup
             dir=$(echo "$dir" | cut -f2 -d':')
         fi
         if test "x${last_backup}" != "x" && test -d "${last_backup}/${hostname}"; then
-            # set the link-dest parameter to the last backup
-            rsync_options="${rsync_options} --link-dest=${last_backup}/${hostname}/"
+            # set the arglink-dest parameter to the last backup
+            link_dest_arg="--link-dest="
+            link_dest_val="${last_backup}/${hostname}/"
         fi
 
-        if test "x$dryrun" == "xno"; then
-            mkdir -p "$tmpdir/unfinished_backup/$this_backup/$hostname"
+        if test "x${dryrun}" == "xno"; then
+            mkdir -p "${tmpdir}/unfinished_backup/${this_backup}/${hostname}"
 
-            rsync ${rsync_options} ${rsyncpath:+"${rsyncpath}"} -e "ssh -p $port $identity" "${dir}/" "${tmpdir}/unfinished_backup/$this_backup/${hostname}" 2>&1 >/tmp/bontmia_rsync_output.$$ || {
+            rsync ${rsync_options} ${excludefrom_arg}"${exclude_from_val}" ${link_dest_arg}"${link_dest_val}" \
+                  -T "${tmpdir}" ${rsyncpath:+"${rsyncpath}"} -e "ssh -p $port $identity"                     \
+                  "${dir}/" "${tmpdir}/unfinished_backup/$this_backup/${hostname}" 2>&1 >/tmp/bontmia_rsync_output.$$ || {
                 echo
                 echo "  Caught an error doing rsync (return code $?)"
                 echo "  The last 10 lines of output from rsync:"
                 tail -10 /tmp/bontmia_rsync_output.$$
                 echo
                 echo "  Retrying rsync..."
-                rsync ${rsync_options} ${rsyncpath:+"${rsyncpath}"} -e "ssh -p $port $identity" "${dir}/" "${tmpdir}/unfinished_backup/$this_backup/${hostname}" 2>&1 >/tmp/bontmia_rsync_output.$$.2 || {
+                rsync ${rsync_options} ${excludefrom_arg}"${exclude_from_val}" ${link_dest_arg}"${link_dest_val}" \
+                      -T "${tmpdir}" ${rsyncpath:+"${rsyncpath}"} -e "ssh -p $port $identity"                     \
+                      "${dir}/" "${tmpdir}/unfinished_backup/$this_backup/${hostname}" 2>&1 >/tmp/bontmia_rsync_output.$$.2 || {
                     echo
                     echo "  Still no luck.  Rsync failed with returncode $?"
                     echo "  $dir"
@@ -379,8 +384,8 @@ make_backup()
 
     moving_complete_backup_into_archive
 
-    if test "x$dryrun" == "xno"; then
-        chmod -R u+w ${tmpdir}/unfinished_backup
+    if test "x${dryrun}" == "xno"; then
+        chmod -R u+w "${tmpdir}/unfinished_backup"
         rm -rf "$tmpdir/unfinished_backup"
     fi
 }
@@ -390,66 +395,64 @@ delete_old_backup()
 {
     echo
     echo "Calculates which backups to save"
-    echo "($filter_minutes minutes, $filter_hours hours, $filter_days days, $filter_weeks weeks, $filter_monthly months, $filter_years years)"
+    echo "(${filter_minutes} minutes, ${filter_hours} hours, ${filter_days} days, ${filter_weeks} weeks, ${filter_monthly} months, ${filter_years} years)"
 
     # by saving the x last, the backups will not be deleted even if no
     # new backups is created
 
-    # archives_to_save=$( (
-
     archives_with_filter=$(
-    if ! test "0$filter_minutes" -ge 0 2>/dev/null; then
+    if ! test "0${filter_minutes}" -ge 0 2>/dev/null; then
         print_usage
     else
-        filter_template "" "" "$filter_minutes" "-u" "minutes"
+        filter_template "" "" "${filter_minutes}" "-u" "minutes"
     fi
 
-    if ! test "0$filter_hours" -ge 0 2>/dev/null; then
+    if ! test "0${filter_hours}" -ge 0 2>/dev/null; then
         print_usage
     else
-        filter_template "" "" "$filter_hours" "-u -k 1,1 -t :" "hours"
+        filter_template "" "" "${filter_hours}" "-u -k 1,1 -t :" "hours"
     fi
 
-    if ! test "0$filter_days" -ge 0 2>/dev/null; then
+    if ! test "0${filter_days}" -ge 0 2>/dev/null; then
         print_usage
     else
-        filter_template "" "" "$filter_days" "-u -k 1,3 -t /" "days"
+        filter_template "" "" "${filter_days}" "-u -k 1,3 -t /" "days"
     fi
 
-    if ! test "0$filter_weeks" -ge 0 2>/dev/null; then
+    if ! test "0${filter_weeks}" -ge 0 2>/dev/null; then
         print_usage
     else
-        filter_template "%Y-%V" "" "$filter_weeks" "-u -k 3 -t @" "weeks"
+        filter_template "%Y-%V" "" "${filter_weeks}" "-u -k 3 -t @" "weeks"
     fi
 
-    if ! test "0$filter_monthly" -ge 0 2>/dev/null; then
+    if ! test "0${filter_monthly}" -ge 0 2>/dev/null; then
         print_usage
     else
-        filter_template "%B" "" "$filter_monthly" "-u -k 1,2 -t /" "month"
+        filter_template "%B" "" "${filter_monthly}" "-u -k 1,2 -t /" "month"
     fi
 
-    if ! test "0$filter_years" -ge 0 2>/dev/null; then
+    if ! test "0${filter_years}" -ge 0 2>/dev/null; then
         print_usage
     else
-        filter_template "%Y" "" "$filter_years" "-u -k 1,1 -t /" "years"
+        filter_template "%Y" "" "${filter_years}" "-u -k 1,1 -t /" "years"
     fi
     )
 
-    archives_to_save=$(echo "$archives_with_filter" | cut -f1 -d'@' | sort -u)
+    archives_to_save=$(echo $archives_with_filter | cut -f1 -d'@' | sort -u)
 
     (
-    cd ${backup_destination}
+    cd "${backup_destination}"
     for archive in */*/*/*; do
-        if ! echo "${archives_to_save}" | grep "^${archive}$" >/dev/null; then
-            echo "  Removing ${backup_destination}/$archive"
-            if test "x$dryrun" == "xno"; then
-                chmod -R u+w ${archive}
-                rm -rf ${archive}
-                rmdir -p $(echo ${archive} | cut -f1-3 -d'/') 2>/dev/null
+        if ! echo $archives_to_save | grep "^${archive}$" >/dev/null; then
+            echo "  Removing ${backup_destination}/${archive}"
+            if test "x${dryrun}" == "xno"; then
+                chmod -R u+w "${archive}"
+                rm -rf "${archive}"
+                rmdir -p "$(echo "${archive}" | cut -f1-3 -d'/')" 2>/dev/null
             fi
         else
-            echo -n "  Saving ${backup_destination}/$archive by filters:  "
-            filters=$(echo "$archives_with_filter" | grep "${archive}" | cut -f2 -d'@')
+            echo -n "  Saving ${backup_destination}/${archive} by filters:  "
+            filters=$(echo $archives_with_filter | grep "${archive}" | cut -f2 -d'@')
             echo $filters
         fi
     done
@@ -462,20 +465,20 @@ knead_source_path()
     source="$1"
 
     # remove trailing '/'
-    if echo "$source" | grep "/$" >/dev/null; then
-        source=$(echo "$source" | sed -e 's/\/$//')
+    if echo $source | grep "/$" >/dev/null; then
+        source=$(echo $source | sed -e 's/\/$//')
     fi
 
     # make the path absolute
-    if ! echo "$source" | grep ":" >/dev/null &&
-       ! echo "$source" | grep "^/" >/dev/null; then
-        if echo "$source" | grep "^./" >/dev/null; then
-            source=$(echo "$source" | sed -e 's/^\.\///')
+    if ! echo $source | grep ":" >/dev/null &&
+       ! echo $source | grep "^/" >/dev/null; then
+        if echo $source | grep "^./" >/dev/null; then
+            source=$(echo $source | sed -e 's/^\.\///')
         fi
-        source="$current_dir/$source"
+        source="${current_dir}/${source}"
     fi
 
-    echo "$source"
+    echo $source
 }
 
 
@@ -483,22 +486,22 @@ knead_dest_path()
 {
     dest="$1"
 
-    if echo "$dest" | grep ":" >/dev/null; then
+    if echo $dest | grep ":" >/dev/null; then
         # The destination can not be remote
         print_usage
     fi
 
     # remove trailing '/'
-    if echo "$dest" | grep "/$" >/dev/null; then
-        dest=$(echo "$dest" | sed -e 's/\/$//')
+    if echo $dest | grep "/$" >/dev/null; then
+        dest=$(echo $dest | sed -e 's/\/$//')
     fi
 
     # make the path absolute
-    if ! echo "$dest" | grep "^/" >/dev/null; then
-        if echo "$dest" | grep "^./" >/dev/null; then
-            dest=$(echo "$dest" | sed -e 's/^\.\///')
+    if ! echo $dest | grep "^/" >/dev/null; then
+        if echo $dest | grep "^./" >/dev/null; then
+            dest=$(echo $dest | sed -e 's/^\.\///')
         fi
-        dest="$current_dir/$dest"
+        dest="${current_dir}/${dest}"
     fi
 
     echo "$dest"
@@ -508,8 +511,8 @@ knead_dest_path()
 check_program()
 {
     program="$1"
-    type -a "$program" >/dev/null 2>&1 } || {
-        echo "You need $program installed and in the path"
+    type -a "${program}" >/dev/null 2>&1 } || {
+        echo "You need ${program} installed and in the path"
         echo "Aborting"
         unlock_destination
         exit 1
@@ -567,7 +570,7 @@ check_for_programs()
 
 check_system()
 {
-    if test "x`stat -c %d ${backup_destination}`" != "x`stat -c %d ${tmpdir}`" ; then
+    if test "x`stat -c %d "${backup_destination}"`" != "x`stat -c %d "${tmpdir}"`" ; then
         echo "tmpdir is not on the same volume as destination"
         unlock_destination
         exit 1
@@ -583,7 +586,7 @@ check_system()
     rm -f /tmp/bontmia_test_file.$$
 
     tmpfile=${tmpdir}/bontmia_test_file.$$
-    touch $tmpfile || {
+    touch "$tmpfile" || {
         echo "Could not create a temporary file on ${tmpdir}"
         echo "Please make sure that ${tmpdir} is writable"
         echo "Aborting"
@@ -591,8 +594,8 @@ check_system()
         exit 1
     }
 
-    ln ${tmpfile} ${tmpfile}.hardlink && rm -f ${tmpfile} ${tmpfile}.hardlink || {
-        rm -f ${tmpfile}
+    ln "${tmpfile}" "${tmpfile}.hardlink" && rm -f "${tmpfile}" "${tmpfile}.hardlink" || {
+        rm -f "${tmpfile}"
         echo "Could not create a hard link on ${tmpdir}"
         echo "Please make sure that the filesystem supports hard links"
         echo "Aborting"
@@ -625,21 +628,23 @@ exit_status="0"
 do_del_old="no"
 port="22"
 identity=""
-excludefrom=""
+excludefrom_arg=""
+excludefrom_val=""
 rsyncpath=""
 stats=""
 compression=""
 rotation=""
 dryrun="no"
 
-while test "x$*" != x; do
+while [ $# -gt 0 ]; do
+
     case "$1" in
   ( "--dryrun" )
       shift
       dryrun="yes";;
   ( "--rotation" )
       shift
-      rotation=$(echo "$1" | perl -e '$_=<STDIN>; m/^([0-9]*)minutes([0-9]*)hours([0-9]*)days([0-9]*)weeks([0-9]*)month([0-9]*)years$/ || exit 1;
+      rotation=$(echo $1 | perl -e '$_=<STDIN>; m/^([0-9]*)minutes([0-9]*)hours([0-9]*)days([0-9]*)weeks([0-9]*)month([0-9]*)years$/ || exit 1;
 print "minutes:$1\n";
 print "hours:$2\n";
 print "days:$3\n";
@@ -650,12 +655,12 @@ print "years:$6\n";
     echo "the option to rotation were not right!"
     print_usage
 }
-      filter_minutes=$(echo "$rotation" | grep minutes | cut -f2 -d':')
-      filter_hours=$(  echo "$rotation" | grep hours   | cut -f2 -d':')
-      filter_days=$(   echo "$rotation" | grep days    | cut -f2 -d':')
-      filter_weeks=$(  echo "$rotation" | grep weeks   | cut -f2 -d':')
-      filter_monthly=$(echo "$rotation" | grep month   | cut -f2 -d':')
-      filter_years=$(  echo "$rotation" | grep years   | cut -f2 -d':')
+      filter_minutes=$(echo "${rotation}" | grep minutes | cut -f2 -d':')
+      filter_hours=$(  echo "${rotation}" | grep hours   | cut -f2 -d':')
+      filter_days=$(   echo "${rotation}" | grep days    | cut -f2 -d':')
+      filter_weeks=$(  echo "${rotation}" | grep weeks   | cut -f2 -d':')
+      filter_monthly=$(echo "${rotation}" | grep month   | cut -f2 -d':')
+      filter_years=$(  echo "${rotation}" | grep years   | cut -f2 -d':')
       do_del_old="yes";
       shift;;
   ( "--port" )
@@ -668,7 +673,8 @@ print "years:$6\n";
       shift;;
   ( "--exclude-from" )
       shift
-      excludefrom="--exclude-from=$1"
+      excludefrom_arg="--exclude-from="
+      excludefrom_val="$1"
       shift;;
   ( "--sudo" )
       shift
@@ -702,32 +708,38 @@ print "years:$6\n";
           exit 1
       fi
       backup_dirs=""
-      while test "x$*" != x; do
-          dir="$1"
+      for dir in "$@"; do
           if ! echo "$dir" | grep ":" >/dev/null; then
               remotehost="$(hostname)"
-              dir="$remotehost:$(knead_source_path "$dir")"
+              dir="$remotehost:$(knead_source_path "${dir}")"
           else
-              backuppath="$(echo "$dir" | cut -f2- -d':')"
+              backuppath="$(echo "${dir}" | cut -f2- -d':')"
               if echo "$dir" | grep "@" >/dev/null; then
-                  remotehost=$(echo "$dir" | cut -f1 -d':' | cut -f2 -d'@')
-                  remoteuser=$(echo "$dir" | cut -f1 -d':' | cut -f1 -d'@')
+                  remotehost=$(echo "${dir}" | cut -f1 -d':' | cut -f2 -d'@')
+                  remoteuser=$(echo "${dir}" | cut -f1 -d':' | cut -f1 -d'@')
               else
-                  remotehost=$(echo "$dir" | cut -f1 -d':')
+                  remotehost=$(echo "${dir}" | cut -f1 -d':')
                   remoteuser=$(whoami)
               fi
 
-              if echo "$dir" | cut -f2- -d':' | grep "^/" >/dev/null; then
+              if echo "${dir}" | cut -f2- -d':' | grep "^/" >/dev/null; then
                   abolutepart=""
               else
                   absolutepart=$(ssh $remotehost pwd)"/"
               fi
 
-              dir="$remoteuser@$remotehost:$absolutepart$backuppath"
+              dir="${remoteuser}@${remotehost}:${absolutepart}${backuppath}"
           fi
-          backup_dirs="$backup_dirs $(knead_source_path "$dir")"
-          shift
-      done;;
+
+          backup_dir=$(knead_source_path "${dir}")
+          if test -n "${backup_dirs}" ; then
+              backup_dirs="${backup_dirs} ${backup_dir}"
+          else
+              backup_dirs="${backup_dir}"
+          fi
+
+      done
+      shift $#;;
   ( * )
       print_usage
       exit 1;;
@@ -736,47 +748,46 @@ done
 
 check_system
 
-rsync_options="-azv -T $tmpdir --force --relative --hard-links --delete $bwlimit $excludefrom $stats"
+rsync_options="-azv --force --relative --hard-links --delete ${bwlimit} ${stats}"
 
 # to speed up checking for files outside the backup areas
 bdirmatch=$(
     first="yes"
     echo -n "^("
-    for d in $backup_dirs; do
-        dir="$d"
-        if test "$first" == "yes"; then
-            if echo "$dir" | grep ":" >/dev/null; then
-                dir_wo_user=$(echo "$dir" | cut -f2- -d'@')
-                echo -n "./$dir_wo_user/"
+    for dir in "${backup_dirs}"; do
+        if test "${first}" == "yes"; then
+            if echo "${dir}" | grep ":" >/dev/null; then
+                dir_wo_user=$(echo "${dir}" | cut -f2- -d'@')
+                echo -n "./${dir_wo_user}/"
             else
-                echo -n ".$dir/"
+                echo -n ".${dir}/"
             fi
             first="no"
         else
-            if echo "$dir" | grep ":" >/dev/null; then
-                dir_wo_user=$(echo "$dir" | cut -f2- -d'@')
-                echo -n "|./$dir_wo_user/"
+            if echo "${dir}" | grep ":" >/dev/null; then
+                dir_wo_user=$(echo "${dir}" | cut -f2- -d'@')
+                echo -n "|./${dir_wo_user}/"
             else
-                echo -n "|.$dir/"
+                echo -n "|.${dir}/"
             fi
         fi
     done
     echo -n ")"
 )
 
-echo "bdirmatch: $bdirmatch"
+echo "bdirmatch: ${bdirmatch}"
 
 lock_destination
 
-if test "x$backup_dirs" != x; then
+if test "x${backup_dirs}" != "x"; then
     make_backup
 fi
 
-if test "x$do_del_old" == xyes; then
+if test "x${do_del_old}" == "xyes"; then
     delete_old_backup
 fi
 
-if test "x$stats" != x; then
+if test "x${stats}" != "x"; then
     output_rsync_stats
 fi
 
