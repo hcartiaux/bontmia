@@ -347,15 +347,14 @@ make_backup()
         fi
         if test "x${last_backup}" != "x" && test -d "${last_backup}/${hostname}"; then
             # set the arglink-dest parameter to the last backup
-            link_dest_arg="--link-dest="
-            link_dest_val="${last_backup}/${hostname}/"
+            linkdest="${last_backup}/${hostname}/"
         fi
 
         if test "x${dryrun}" == "xno"; then
             mkdir -p "${tmpdir}/unfinished_backup/${this_backup}/${hostname}"
 
-            rsync ${rsync_options} ${excludefrom_arg}"${excludefrom_val}" ${link_dest_arg}"${link_dest_val}" \
-                  -T "${tmpdir}" ${rsyncpath:+"${rsyncpath}"} -e "ssh -p $port $identity"                     \
+            rsync ${rsync_options} ${excludefrom:+--exclude-from="$excludefrom"} ${linkdest:+--link-dest="${linkdest}"} \
+                  -T "${tmpdir}" ${rsyncpath:+"${rsyncpath}"} -e "ssh -p $port $identity"                               \
                   "${dir}/" "${tmpdir}/unfinished_backup/$this_backup/${hostname}" 2>&1 >/tmp/bontmia_rsync_output.$$ || {
                 echo
                 echo "  Caught an error doing rsync (return code $?)"
@@ -363,8 +362,8 @@ make_backup()
                 tail -10 /tmp/bontmia_rsync_output.$$
                 echo
                 echo "  Retrying rsync..."
-                rsync ${rsync_options} ${excludefrom_arg}"${excludefrom_val}" ${link_dest_arg}"${link_dest_val}" \
-                      -T "${tmpdir}" ${rsyncpath:+"${rsyncpath}"} -e "ssh -p $port $identity"                     \
+                rsync ${rsync_options} ${excludefrom:+--exclude-from="$excludefrom"} ${linkdest:+--link-dest="${linkdest}"} \
+                      -T "${tmpdir}" ${rsyncpath:+"${rsyncpath}"} -e "ssh -p $port $identity"                               \
                       "${dir}/" "${tmpdir}/unfinished_backup/$this_backup/${hostname}" 2>&1 >/tmp/bontmia_rsync_output.$$.2 || {
                     echo
                     echo "  Still no luck.  Rsync failed with returncode $?"
@@ -628,8 +627,7 @@ exit_status="0"
 do_del_old="no"
 port="22"
 identity=""
-excludefrom_arg=""
-excludefrom_val=""
+excludefrom=""
 rsyncpath=""
 stats=""
 compression=""
@@ -673,8 +671,7 @@ print "years:$6\n";
       shift;;
   ( "--exclude-from" )
       shift
-      excludefrom_arg="--exclude-from="
-      excludefrom_val="$1"
+      excludefrom="$1"
       shift;;
   ( "--sudo" )
       shift
