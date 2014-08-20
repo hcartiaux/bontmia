@@ -263,7 +263,7 @@ filter_template()
 
 handle_last_unfinished()
 {
-    if test -e "${tmpdir}/unfinished_backup/*"; then
+    if test -d "${tmpdir}/unfinished_backup"; then
         echo
         echo "WARNING: Last backup did not complete"
         echo "  This unfinished backup is now removed"
@@ -295,7 +295,7 @@ moving_complete_backup_into_archive()
 
 do_the_backup_exist()
 {
-    if test -e "$backup_destination/$1"; then
+    if test -e "${backup_destination}/$1"; then
         echo "The backup destination already exist"
         echo "This means that there is less than a minute since the last backup"
         unlock_destination
