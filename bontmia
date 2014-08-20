@@ -244,10 +244,10 @@ filter_template()
     (
         cd "${backup_destination}"
         for archive in */*/*/*; do
-            year=$(     echo ${archive} | cut -f1 -d'/')
-            month=$(    echo ${archive} | cut -f2 -d'/')
-            day=$(      echo ${archive} | cut -f3 -d'/')
-            the_clock=$(echo ${archive} | cut -f4 -d'/')
+            year=$(     echo "${archive}" | cut -f1 -d'/')
+            month=$(    echo "${archive}" | cut -f2 -d'/')
+            day=$(      echo "${archive}" | cut -f3 -d'/')
+            the_clock=$(echo "${archive}" | cut -f4 -d'/')
 
             the_date="${year}-${month}-${day}"
             date -d "${the_date}" "+%Y/%m/%d/${the_clock}@${template_name}@${attribute}" || {
@@ -428,7 +428,7 @@ delete_old_backup()
     if ! test "0${filter_monthly}" -ge 0 2>/dev/null; then
         print_usage
     else
-        filter_template "%B" "" "${filter_monthly}" "-u -k 1,2 -t /" "month"
+        filter_template "%B" "" "${filter_monthly}" "-u -k 1,2 -t /" "months"
     fi
 
     if ! test "0${filter_years}" -ge 0 2>/dev/null; then
@@ -438,21 +438,21 @@ delete_old_backup()
     fi
     )
 
-    archives_to_save=$(echo $archives_with_filter | cut -f1 -d'@' | sort -u)
+    archives_to_save=$(echo "${archives_with_filter}" | cut -f1 -d'@' | sort -u)
 
     (
     cd "${backup_destination}"
     for archive in */*/*/*; do
-        if ! echo $archives_to_save | grep "^${archive}$" >/dev/null; then
-            echo "  Removing ${backup_destination}/${archive}"
+        if ! echo "${archives_to_save}" | grep "^${archive}$" >/dev/null; then
+            echo " Removing ${backup_destination}/$archive"
             if test "x${dryrun}" == "xno"; then
                 chmod -R u+w "${archive}"
                 rm -rf "${archive}"
-                rmdir -p "$(echo "${archive}" | cut -f1-3 -d'/')" 2>/dev/null
+                rmdir -p $(echo "${archive}" | cut -f1-3 -d'/') 2>/dev/null
             fi
         else
-            echo -n "  Saving ${backup_destination}/${archive} by filters:  "
-            filters=$(echo $archives_with_filter | grep "${archive}" | cut -f2 -d'@')
+            echo -n " Saving ${backup_destination}/${archive} by filters: "
+            filters=$(echo "${archives_with_filter}" | grep "${archive}" | cut -f2 -d'@')
             echo $filters
         fi
     done
@@ -465,20 +465,20 @@ knead_source_path()
     source="$1"
 
     # remove trailing '/'
-    if echo $source | grep "/$" >/dev/null; then
-        source=$(echo $source | sed -e 's/\/$//')
+    if echo "${source}" | grep "/$" >/dev/null; then
+        source=$(echo "${source}" | sed -e 's/\/$//')
     fi
 
     # make the path absolute
-    if ! echo $source | grep ":" >/dev/null &&
-       ! echo $source | grep "^/" >/dev/null; then
-        if echo $source | grep "^./" >/dev/null; then
-            source=$(echo $source | sed -e 's/^\.\///')
+    if ! echo "${source}" | grep ":" >/dev/null &&
+       ! echo "${source}" | grep "^/" >/dev/null; then
+        if echo "${source}" | grep "^./" >/dev/null; then
+            source=$(echo "${source}" | sed -e 's/^\.\///')
         fi
         source="${current_dir}/${source}"
     fi
 
-    echo $source
+    echo "${source}"
 }
 
 
@@ -486,20 +486,20 @@ knead_dest_path()
 {
     dest="$1"
 
-    if echo $dest | grep ":" >/dev/null; then
+    if echo "${dest}" | grep ":" >/dev/null; then
         # The destination can not be remote
         print_usage
     fi
 
     # remove trailing '/'
-    if echo $dest | grep "/$" >/dev/null; then
-        dest=$(echo $dest | sed -e 's/\/$//')
+    if echo "${dest}" | grep "/$" >/dev/null; then
+        dest=$(echo "${dest}" | sed -e 's/\/$//')
     fi
 
     # make the path absolute
-    if ! echo $dest | grep "^/" >/dev/null; then
-        if echo $dest | grep "^./" >/dev/null; then
-            dest=$(echo $dest | sed -e 's/^\.\///')
+    if ! echo "${dest}" | grep "^/" >/dev/null; then
+        if echo "${dest}" | grep "^./" >/dev/null; then
+            dest=$(echo "${dest}" | sed -e 's/^\.\///')
         fi
         dest="${current_dir}/${dest}"
     fi
