@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+#
+# check_backup_bontmia
+#
+# Check the freshness of your bontmia backups with icinga or nagios.
+#
+# Original author:
+#   (c) 2014 Hyacinthe Cartiaux  <hyacinthe.cartiaux@free.fr>
+#       https://github.com/hcartiaux/bontmia/
+#
+# nagios: check_backup_bontmia
+#
+# nagios_cmd: check_backup_bontmia PATH [WARNING [CRITICAL]]
+
+function sendOk() {
+  [ -z "$1" ] && echo "OK" || echo "OK: $1"
+  exit 0
+}
+
+function sendWarning() {
+  echo "WARNING: $1"
+  exit 1
+}
+
+function sendCritical() {
+  echo "CRITICAL: $1"
+  exit 2
+}
+
+function sendUnknown() {
+  echo "UNKNOWN: $1"
+  exit 3
+}
+
+bkp_path=${1}
+bkp_name=$(basename $1)
+day_warning=${2:-3}
+day_critical=${3:-4}
+
+[[ $day_warning -ge $day_critical ]] && sendUnknown "The warning threshold must be lower than the critical threshold"
+
+[[ ! -d $bkp_path                 ]] && sendUnknown "The backup directory is absent"
+
+cd $bkp_path
+last_backup=$(find . -maxdepth 4 -mindepth 4 | grep -v unfinished_backup | sort | tail -1)
+
+[[ ! -d $last_backup              ]] && sendUnknown "No backup detected in the directory"
+
+
+YEAR=$( echo $last_backup | cut -d'/' -f2)
+MONTH=$(echo $last_backup | cut -d'/' -f3)
+DAY=$(  echo $last_backup | cut -d'/' -f4)
+
+let day_without_backup=(`date +%s` - `date +%s -d ${YEAR}${MONTH}${DAY}`)/86400
+
+if [ $day_without_backup -ge $day_critical  ]; then
+  sendCritical "${bkp_name} not backed up in the last ${day_without_backup} days"
+elif [ $day_without_backup -ge $day_warning  ]; then
+  sendWarning  "${bkp_name} not backed up in the last ${day_without_backup} days"
+elif [ $day_without_backup -lt $day_warning  ]; then
+  sendOk       "${bkp_name} backed up the ${YEAR}/${MONTH}/${DAY}"
+fi
+
