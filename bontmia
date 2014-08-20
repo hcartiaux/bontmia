@@ -193,8 +193,8 @@ EOF
 
 unlock_destination()
 {
-    rm -f "${tmpdir}/is_running.lock"
-    rm -f /tmp/bontmia_rsync_output.$$ > /dev/null 2>&1
+    rm -f "${tmpdir}/is_running.lock"    > /dev/null 2>&1
+    rm -f /tmp/bontmia_rsync_output.$$   > /dev/null 2>&1
     rm -f /tmp/bontmia_rsync_output.$$.2 > /dev/null 2>&1
 }
 
@@ -464,7 +464,7 @@ knead_source_path()
     fi
 
     # make the path absolute
-    if ! echo "${source}" | grep ":" >/dev/null &&
+    if ! echo "${source}" | grep ":"  >/dev/null  &&
        ! echo "${source}" | grep "^/" >/dev/null; then
         if echo "${source}" | grep "^./" >/dev/null; then
             source=$(echo "${source}" | sed -e 's/^\.\///')
@@ -505,7 +505,7 @@ knead_dest_path()
 check_program()
 {
     program="$1"
-    type -a "${program}" >/dev/null 2>&1 } || {
+    type -a "${program}"                         >/dev/null 2>&1 } || {
         echo "You need ${program} installed and in the path"
         echo "Aborting"
         unlock_destination
@@ -534,7 +534,7 @@ check_for_programs()
     check_program tail
 
     check_program rsync
-    rsync --help | grep link-dest >/dev/null 2>/dev/null || {
+    rsync --help | grep link-dest                > /dev/null 2>&1 || {
         echo "'rsync' on your system does not support the 'link-dest' option"
         echo "Your rsync version might be too old"
         echo "Aborting"
@@ -543,7 +543,7 @@ check_for_programs()
     }
 
     check_program find
-    find /tmp -maxdepth 1 -mindepth 1 >/dev/null 2>/dev/null || {
+    find /tmp -maxdepth 1 -mindepth 1            > /dev/null 2>&1 || {
         echo "'find' on your system does not support the '--maxdepth' and"
         echo "'--mindepth' options"
         echo "You might not have the GNU version of 'find'"
@@ -553,7 +553,7 @@ check_for_programs()
     }
 
     check_program date
-    date -d 20030303 >/dev/null 2>/dev/null || {
+    date -d 20030303                             > /dev/null 2>&1 || {
         echo "'date' on your system does not support the '--date' option"
         echo "You might not have the GNU version of 'date'"
         echo "Aborting"
@@ -570,17 +570,17 @@ check_system()
         exit 1
     fi
 
-    touch /tmp/bontmia_test_file.$$ || {
+    touch /tmp/bontmia_test_file.$$              > /dev/null 2>&1 || {
         echo "Could not create a temporary file on /tmp"
         echo "Please make sure that /tmp is writable"
         echo "Aborting"
         unlock_destination
         exit 1
     }
-    rm -f /tmp/bontmia_test_file.$$
+    rm -f /tmp/bontmia_test_file.$$              > /dev/null 2>&1
 
     tmpfile=${tmpdir}/bontmia_test_file.$$
-    touch "$tmpfile" || {
+    touch "$tmpfile"                             > /dev/null 2>&1 || {
         echo "Could not create a temporary file on ${tmpdir}"
         echo "Please make sure that ${tmpdir} is writable"
         echo "Aborting"
@@ -588,15 +588,18 @@ check_system()
         exit 1
     }
 
-    ln "${tmpfile}" "${tmpfile}.hardlink" && rm -f "${tmpfile}" "${tmpfile}.hardlink" || {
-        rm -f "${tmpfile}"
+    set -x
+    ln    "${tmpfile}" "${tmpfile}.hardlink"     > /dev/null 2>&1 || {
+        rm -f "${tmpfile}" "${tmpfile}.hardlink" > /dev/null 2>&1
         echo "Could not create a hard link on ${tmpdir}"
         echo "Please make sure that the filesystem supports hard links"
         echo "Aborting"
         unlock_destination
         exit 1
     }
+    rm -f "${tmpfile}" "${tmpfile}.hardlink"     > /dev/null 2>&1
     unset tmpfile
+    set +x
 }
 
 
