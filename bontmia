@@ -331,7 +331,7 @@ make_backup()
         fi
     fi
 
-    for dir in "${backup_dirs}" ; do
+    for dir in "${backup_dirs[@]}"; do
         dir_wo_user=$(echo "${dir}" | cut -f2- -d'@')
         echo "  ${dir_wo_user}"
         hostname=$(echo "${dir}" | cut -f2- -d'@' | cut -f1 -d':')":"
@@ -345,7 +345,6 @@ make_backup()
             # set the arglink-dest parameter to the last backup
             linkdest="${last_backup}/${hostname}/"
         fi
-
         if test "x${dryrun}" == "xno"; then
             mkdir -p "${tmpdir}/unfinished_backup/${this_backup}/${hostname}"
 
@@ -617,8 +616,7 @@ filter_days="7"
 filter_weeks="4"
 filter_monthly="12"
 filter_years="0"
-bwlimit=""
-backup_dirs=""
+backup_dirs=()
 exit_status="0"
 do_del_old="no"
 port="22"
@@ -700,7 +698,6 @@ print "years:$6\n";
           echo "Missing source directories"
           exit 1
       fi
-      backup_dirs=""
       for dir in "$@"; do
           if ! echo "$dir" | grep ":" >/dev/null; then
               remotehost="$(hostname)"
@@ -724,12 +721,7 @@ print "years:$6\n";
               dir="${remoteuser}@${remotehost}:${absolutepart}${backuppath}"
           fi
 
-          backup_dir=$(knead_source_path "${dir}")
-          if test -n "${backup_dirs}" ; then
-              backup_dirs="${backup_dirs} ${backup_dir}"
-          else
-              backup_dirs="${backup_dir}"
-          fi
+          backup_dirs+=("$(knead_source_path "${dir}")")
 
       done
       shift $#;;
@@ -747,7 +739,7 @@ rsync_options="-azv --force --relative --hard-links --delete ${bwlimit} ${stats}
 bdirmatch=$(
     first="yes"
     echo -n "^("
-    for dir in "${backup_dirs}"; do
+    for dir in "${backup_dirs[@]}"; do
         if test "${first}" == "yes"; then
             if echo "${dir}" | grep ":" >/dev/null; then
                 dir_wo_user=$(echo "${dir}" | cut -f2- -d'@')
@@ -772,7 +764,7 @@ echo "bdirmatch: ${bdirmatch}"
 
 lock_destination
 
-if test "x${backup_dirs}" != "x"; then
+if test ${#backup_dirs[@]} -gt 0; then
     make_backup
 fi
 
