@@ -588,7 +588,6 @@ check_system()
         exit 1
     }
 
-    set -x
     ln    "${tmpfile}" "${tmpfile}.hardlink"     > /dev/null 2>&1 || {
         rm -f "${tmpfile}" "${tmpfile}.hardlink" > /dev/null 2>&1
         echo "Could not create a hard link on ${tmpdir}"
@@ -599,7 +598,6 @@ check_system()
     }
     rm -f "${tmpfile}" "${tmpfile}.hardlink"     > /dev/null 2>&1
     unset tmpfile
-    set +x
 }
 
 
