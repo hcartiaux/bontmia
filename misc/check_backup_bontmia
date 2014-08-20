@@ -4,7 +4,7 @@
 #
 # Check the freshness of your bontmia backups with icinga or nagios.
 #
-# Original author:
+# Author:
 #   (c) 2014 Hyacinthe Cartiaux  <hyacinthe.cartiaux@free.fr>
 #       https://github.com/hcartiaux/bontmia/
 #
