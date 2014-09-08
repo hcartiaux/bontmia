@@ -716,7 +716,7 @@ print "years:$6\n";
               if echo "${dir}" | cut -f2- -d':' | grep "^/" >/dev/null; then
                   abolutepart=""
               else
-                  absolutepart=$(ssh $remotehost pwd)"/"
+                  absolutepart=$(ssh $remoteuser@$remotehost pwd)"/"
               fi
 
               dir="${remoteuser}@${remotehost}:${absolutepart}${backuppath}"
