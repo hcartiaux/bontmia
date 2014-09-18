@@ -132,6 +132,11 @@ OPTIONS
 
   Output rsync stats at the end
 
+  --compression
+
+  Enable rsync compression, can be useful over a slow network link or
+  counterproductive over a fast link.
+
 EXAMPLES
 
   Short examples and explanations:
@@ -734,7 +739,7 @@ done
 
 check_system
 
-rsync_options="-azv --force --relative --hard-links --delete ${bwlimit} ${stats}"
+rsync_options="-av ${compression} --force --relative --hard-links --delete ${bwlimit} ${stats}"
 
 # to speed up checking for files outside the backup areas
 bdirmatch=$(
