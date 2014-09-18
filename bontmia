@@ -574,40 +574,51 @@ check_for_programs()
 
 check_system()
 {
-    if test "x`stat -c %d "${backup_destination}"`" != "x`stat -c %d "${tmpdir}"`" ; then
-        echo "tmpdir is not on the same volume as destination"
+    if test -n "${backup_destination}" && test -n "${tmpdir}" ; then
+
+        if test "x`stat -c %d "${backup_destination}" 2> /dev/null`" != "x`stat -c %d "${tmpdir}" 2> /dev/null`" ; then
+            echo "tmpdir is not on the same volume as destination"
+            unlock_destination
+            exit 1
+        fi
+
+        touch /tmp/bontmia_test_file.$$              > /dev/null 2>&1 || {
+            echo "Could not create a temporary file on /tmp"
+            echo "Please make sure that /tmp is writable"
+            echo "Aborting"
+            unlock_destination
+            exit 1
+        }
+        rm -f /tmp/bontmia_test_file.$$              > /dev/null 2>&1
+
+        tmpfile=${tmpdir}/bontmia_test_file.$$
+        touch "$tmpfile"                             > /dev/null 2>&1 || {
+            echo "Could not create a temporary file on ${tmpdir}"
+            echo "Please make sure that ${tmpdir} is writable"
+            echo "Aborting"
+            unlock_destination
+            exit 1
+        }
+
+        ln    "${tmpfile}" "${tmpfile}.hardlink"     > /dev/null 2>&1 || {
+            rm -f "${tmpfile}" "${tmpfile}.hardlink" > /dev/null 2>&1
+            echo "Could not create a hard link on ${tmpdir}"
+            echo "Please make sure that the filesystem supports hard links"
+            echo "Aborting"
+            unlock_destination
+            exit 1
+        }
+        rm -f "${tmpfile}" "${tmpfile}.hardlink"     > /dev/null 2>&1
+        unset tmpfile
+
+    fi
+
+    if test -n "${cipher}" && test "`ssh $cipher 2>&1| grep -c "Unknown cipher type"`" != "0" ; then
+        echo "This cipher (${cipher}) is not supported by your local ssh version"
+        echo "Aborting"
         unlock_destination
         exit 1
     fi
-
-    touch /tmp/bontmia_test_file.$$              > /dev/null 2>&1 || {
-        echo "Could not create a temporary file on /tmp"
-        echo "Please make sure that /tmp is writable"
-        echo "Aborting"
-        unlock_destination
-        exit 1
-    }
-    rm -f /tmp/bontmia_test_file.$$              > /dev/null 2>&1
-
-    tmpfile=${tmpdir}/bontmia_test_file.$$
-    touch "$tmpfile"                             > /dev/null 2>&1 || {
-        echo "Could not create a temporary file on ${tmpdir}"
-        echo "Please make sure that ${tmpdir} is writable"
-        echo "Aborting"
-        unlock_destination
-        exit 1
-    }
-
-    ln    "${tmpfile}" "${tmpfile}.hardlink"     > /dev/null 2>&1 || {
-        rm -f "${tmpfile}" "${tmpfile}.hardlink" > /dev/null 2>&1
-        echo "Could not create a hard link on ${tmpdir}"
-        echo "Please make sure that the filesystem supports hard links"
-        echo "Aborting"
-        unlock_destination
-        exit 1
-    }
-    rm -f "${tmpfile}" "${tmpfile}.hardlink"     > /dev/null 2>&1
-    unset tmpfile
 }
 
 
@@ -747,7 +758,6 @@ print "years:$6\n";
     esac
 done
 
-check_system
 
 rsync_options="-av ${compression} --force --relative --hard-links --delete ${bwlimit} ${stats}"
 
@@ -777,6 +787,8 @@ bdirmatch=$(
 )
 
 echo "bdirmatch: ${bdirmatch}"
+
+check_system
 
 lock_destination
 
