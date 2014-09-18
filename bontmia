@@ -116,6 +116,11 @@ OPTIONS
   Specifies the port number to connect to on the remote host when using ssh,
   which is the only option.
 
+  --cipher <cipher_spec>
+
+  Selects the cipher specification for encrypting the ssh session. Refer to
+  ssh(1) and ssh_config(5) for a list of supported ciphers.
+
   --identity <file>
 
   Specifies the private key file for ssh
@@ -181,7 +186,7 @@ MANPAGE
       $ bontmia | txt2man -t bontmia -s 1 > bontmia.1
 
 SEE ALSO
-  rsync(1)
+  rsync(1) ssh(1) ssh_config(5)
 
 CONTACT
   Bontmia was written in april 2003 by John Enok Vollestad <john.enok@vollestad.no>
@@ -354,7 +359,7 @@ make_backup()
             mkdir -p "${tmpdir}/unfinished_backup/${this_backup}/${hostname}"
 
             rsync ${rsync_options} ${excludefrom:+--exclude-from="$excludefrom"} ${linkdest:+--link-dest="${linkdest}"} \
-                  -T "${tmpdir}" ${rsyncpath:+--rsync-path="${rsyncpath}"} -e "ssh -p $port $identity"                  \
+                  -T "${tmpdir}" ${rsyncpath:+--rsync-path="${rsyncpath}"} -e "ssh $cipher -p $port $identity"          \
                   "${dir}/" "${tmpdir}/unfinished_backup/$this_backup/${hostname}" 2>&1 >/tmp/bontmia_rsync_output.$$ || {
                 echo
                 echo "  Caught an error doing rsync (return code $?)"
@@ -363,7 +368,7 @@ make_backup()
                 echo
                 echo "  Retrying rsync..."
                 rsync ${rsync_options} ${excludefrom:+--exclude-from="$excludefrom"} ${linkdest:+--link-dest="${linkdest}"} \
-                      -T "${tmpdir}" ${rsyncpath:+--rsync-path="${rsyncpath}"} -e "ssh -p $port $identity"                  \
+                      -T "${tmpdir}" ${rsyncpath:+--rsync-path="${rsyncpath}"} -e "ssh $cipher -p $port $identity"          \
                       "${dir}/" "${tmpdir}/unfinished_backup/$this_backup/${hostname}" 2>&1 >/tmp/bontmia_rsync_output.$$.2 || {
                     echo
                     echo "  Still no luck. Rsync failed with returncode $?"
@@ -631,6 +636,7 @@ excludefrom=""
 rsyncpath=""
 stats=""
 compression=""
+cipher=""
 rotation=""
 dryrun="no"
 
@@ -689,6 +695,10 @@ print "years:$6\n";
       shift;;
   ( "--compression" )
       compression="-z"
+      shift;;
+  ( "--cipher" )
+      shift
+      cipher="-c $1"
       shift;;
   ( "--dest" )
       shift;
