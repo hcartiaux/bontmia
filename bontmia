@@ -345,7 +345,6 @@ make_backup()
         dir_wo_user=$(echo "${dir}" | cut -f2- -d'@')
         echo "  ${dir_wo_user}"
         hostname=$(echo "${dir}" | cut -f2- -d'@' | cut -f1 -d':')":"
-        userhost=$(echo "${dir}" | cut -f1 -d':')
 
         if test "x${hostname}" == "x$(hostname):"; then
             # remove hostname from dir to speed up local backup
