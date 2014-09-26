@@ -575,7 +575,7 @@ check_system()
 {
     if test -n "${backup_destination}" && test -n "${tmpdir}" ; then
 
-        if test "x`stat -c %d "${backup_destination}" 2> /dev/null`" != "x`stat -c %d "${tmpdir}" 2> /dev/null`" ; then
+        if test "$(stat -c %d "${backup_destination}" 2> /dev/null)" != "$(stat -c %d "${tmpdir}" 2> /dev/null)" ; then
             echo "tmpdir is not on the same volume as destination"
             unlock_destination
             exit 1
@@ -612,7 +612,7 @@ check_system()
 
     fi
 
-    if test -n "${cipher}" && test "`ssh $cipher 2>&1| grep -c "Unknown cipher type"`" != "0" ; then
+    if test -n "${cipher}" && test "$(ssh $cipher 2>&1| grep -c 'Unknown cipher type')" != "0" ; then
         echo "This cipher (${cipher}) is not supported by your local ssh version"
         echo "Aborting"
         unlock_destination
