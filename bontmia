@@ -515,7 +515,7 @@ knead_dest_path()
 check_program()
 {
     program="$1"
-    type -a "${program}"                         >/dev/null 2>&1 } || {
+    type -a "${program}"                         >/dev/null 2>&1 || {
         echo "You need ${program} installed and in the path"
         echo "Aborting"
         unlock_destination
