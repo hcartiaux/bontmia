@@ -312,7 +312,7 @@ do_the_backup_exist()
 
 make_backup()
 {
-    this_backup="$(date +%Y)/$(date +%m)/$(date +%d)/$(date +%H\:%M)"
+    this_backup="$(date +%Y)/$(date +%m)/$(date +%d)/$(date +%H:%M)"
 
     do_the_backup_exist "$this_backup"
 
