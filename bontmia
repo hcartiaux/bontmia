@@ -357,6 +357,7 @@ make_backup()
         if test "x${dryrun}" == "xno"; then
             mkdir -p "${tmpdir}/unfinished_backup/${this_backup}/${hostname}"
 
+            rsync_exit_status=0
             rsync ${rsync_options} ${excludefrom:+--exclude-from="$excludefrom"} ${linkdest:+--link-dest="${linkdest}"} \
                   -T "${tmpdir}" ${rsyncpath:+--rsync-path="${rsyncpath}"} -e "ssh $cipher -p $port $identity"          \
                   "${dir}/" "${tmpdir}/unfinished_backup/$this_backup/${hostname}" 2>&1 >/tmp/bontmia_rsync_output.$$ || {
@@ -369,7 +370,7 @@ make_backup()
                 rsync ${rsync_options} ${excludefrom:+--exclude-from="$excludefrom"} ${linkdest:+--link-dest="${linkdest}"} \
                       -T "${tmpdir}" ${rsyncpath:+--rsync-path="${rsyncpath}"} -e "ssh $cipher -p $port $identity"          \
                       "${dir}/" "${tmpdir}/unfinished_backup/$this_backup/${hostname}" 2>&1 >/tmp/bontmia_rsync_output.$$.2 || {
-                    exit_status=$?
+                    rsync_exit_status=$?
                     echo
                     echo "  Still no luck. Rsync failed with returncode $?"
                     echo "  ${dir}"
@@ -380,14 +381,17 @@ make_backup()
                     echo
                     echo "  Continuing with the next backup source"
                     echo
+                    exit_status=1
                 }
             }
         fi
     done
 
     # The backup is considered successfull, even if some files have vanished during the transfer
-    if [[ $exit_status == 0 || $exit_status == 24 ]]; then
+    if [[ $rsync_exit_status == 0 || $rsync_exit_status == 24 ]]; then
         moving_complete_backup_into_archive
+    else
+        echo "  rsync failed twice, removing the unfinished backup"
     fi
 
     if test "x${dryrun}" == "xno"; then
