@@ -372,7 +372,7 @@ make_backup()
                       "${dir}/" "${tmpdir}/unfinished_backup/$this_backup/${hostname}" 2>&1 >/tmp/bontmia_rsync_output.$$.2 || {
                     rsync_exit_status=$?
                     # The backup is considered successfull, even if some files have vanished during the transfer
-                    if [[ $rsync_exit_status != 24 ]]; then
+                    if [[ $rsync_exit_status != 24 && $rsync_exit_status != 23 ]]; then
                         exit_status=1
                         echo
                         echo "  Still no luck. Rsync failed with returncode ${rsync_exit_status}"
