@@ -262,7 +262,7 @@ filter_template()
                 unlock_destination
                 exit 1
             }
-        done | egrep "@.*@${grep_value}" | sort -r | $sort | tail -$last_number
+        done | grep -E "@.*@${grep_value}" | sort -r | $sort | tail -$last_number
     )
 }
 
@@ -551,7 +551,6 @@ check_for_programs()
     check_program sed
     check_program sort
     check_program grep
-    check_program egrep
     check_program tail
 
     check_program rsync
