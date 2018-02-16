@@ -299,6 +299,15 @@ moving_complete_backup_into_archive()
 }
 
 
+do_the_srcdir_exist()
+{
+    if test ! -d "$1"; then
+        echo "The backup source $1 does not exist"
+        unlock_destination
+        exit 1
+    fi
+}
+
 do_the_backup_exist()
 {
     if test -e "${backup_destination}/$1"; then
@@ -313,6 +322,10 @@ do_the_backup_exist()
 make_backup()
 {
     this_backup="$(date +%Y)/$(date +%m)/$(date +%d)/$(date +%H:%M)"
+
+    for dir in "${backup_dirs[@]}"; do
+        do_the_srcdir_exist "$dir"
+    done
 
     do_the_backup_exist "$this_backup"
 
