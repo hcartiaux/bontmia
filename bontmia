@@ -437,7 +437,7 @@ delete_old_backup()
     if ! test "0${filter_weeks}" -ge 0 2>/dev/null; then
         print_usage
     else
-        filter_template "%Y-%V" "" "${filter_weeks}" "-u -k 3 -t @" "weeks"
+        filter_template "%G-%V" "" "${filter_weeks}" "-u -k 3 -t @" "weeks"
     fi
 
     if ! test "0${filter_monthly}" -ge 0 2>/dev/null; then
