@@ -247,7 +247,7 @@ filter_template()
     sort_options="$4"
     template_name="$5"
 
-    if test "x${sort_options}" != x; then
+    if test -n "${sort_options}"; then
         sort="sort ${sort_options}"
     else
         sort="cat"
@@ -292,7 +292,7 @@ moving_complete_backup_into_archive()
     echo "Moving the complete backup into the backup archive"
     echo "  ($tmpdir/unfinished_backup -> $backup_destination/)"
 
-    if test "x$dryrun" = "xno"; then
+    if test "$dryrun" = "no"; then
         mkdir -p "$backup_destination/$this_backup" || {
             unlock_destination
             exit 1
@@ -326,10 +326,10 @@ make_backup()
 
 
     last_backup=$(find "${backup_destination}" -maxdepth 4 -mindepth 4 | sort | tail -1)
-    if test "x${last_backup}" != "x" ; then
+    if test -n "${last_backup}" ; then
         echo "Hardlink to files in last backup when unchanged"
         echo "  (${last_backup})"
-        if test "x${dryrun}" = "xno"; then
+        if test "${dryrun}" = "no"; then
             mkdir -p "${tmpdir}/unfinished_backup/${this_backup}" || {
                 unlock_destination
                 exit 1
@@ -338,7 +338,7 @@ make_backup()
         fi
     else
         echo "No previous backup detected, will start with an empty replication"
-        if test "x${dryrun}" = "xno"; then
+        if test "${dryrun}" = "no"; then
             mkdir -p "${tmpdir}/unfinished_backup/$this_backup" || {
                 unlock_destination
                 exit 1
@@ -352,15 +352,15 @@ make_backup()
         echo "  ${dir_wo_user}"
         hostname=$(echo "${dir}" | cut -f2- -d'@' | cut -f1 -d':')":"
 
-        if test "x${hostname}" = "x$(hostname):"; then
+        if test "${hostname}" = "$(hostname):"; then
             # remove hostname from dir to speed up local backup
             dir=$(echo "$dir" | cut -f2 -d':')
         fi
-        if test "x${last_backup}" != "x" && test -d "${last_backup}/${hostname}"; then
+        if test -n "${last_backup}" && test -d "${last_backup}/${hostname}"; then
             # set the arglink-dest parameter to the last backup
             linkdest="${last_backup}/${hostname}/"
         fi
-        if test "x${dryrun}" = "xno"; then
+        if test "${dryrun}" = "no"; then
             mkdir -p "${tmpdir}/unfinished_backup/${this_backup}/${hostname}"
 
             rsync ${RSYNC_CMD} ${rsync_options} ${excludefrom:+--exclude-from="$excludefrom"} ${linkdest:+--link-dest="${linkdest}"} \
@@ -405,7 +405,7 @@ make_backup()
         echo "  rsync failed, removing the unfinished backup"
     fi
 
-    if test "x${dryrun}" = "xno"; then
+    if test "${dryrun}" = "no"; then
         chmod -R u+w "${tmpdir}/unfinished_backup"
         rm -rf "$tmpdir/unfinished_backup"
     fi
@@ -466,7 +466,7 @@ delete_old_backup()
     for archive in */*/*/*; do
         if ! echo "${archives_to_save}" | grep "^${archive}$" >/dev/null; then
             echo " Removing ${backup_destination}/$archive"
-            if test "x${dryrun}" = "xno"; then
+            if test "${dryrun}" = "no"; then
                 chmod -R u+w "${archive}"
                 rm -rf "${archive}"
                 rmdir -p $(echo "${archive}" | cut -f1-3 -d'/') 2>/dev/null
@@ -642,7 +642,7 @@ check_system()
 
 check_for_programs
 
-if test "x$*" = x; then
+if test -z "$*"; then
     print_usage
 fi
 
@@ -737,7 +737,7 @@ print "years:$6\n";
       fi
       shift;;
   ( [^-]* ) # The rest is sources
-      if test "x$1" = "x"; then
+      if test -z "$1"; then
           echo "Missing source directories"
           exit 1
       fi
@@ -812,11 +812,11 @@ if test ${#backup_dirs[@]} -gt 0; then
     make_backup
 fi
 
-if test "x${do_del_old}" = "xyes"; then
+if test "${do_del_old}" = "yes"; then
     delete_old_backup
 fi
 
-if test "x${stats}" != "x"; then
+if test -n "${stats}"; then
     output_rsync_stats
 fi
 
