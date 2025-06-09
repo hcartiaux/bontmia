@@ -144,6 +144,12 @@ OPTIONS
   Enable rsync compression, can be useful over a slow network link or
   counterproductive over a fast link.
 
+ENVIRONMENT
+
+  RSYNC_CMD
+
+  bontmia uses any rsync parameters specified in this variable.
+
 EXAMPLES
 
   Short examples and explanations:
@@ -185,7 +191,7 @@ MANPAGE
 
   The manpage has been generated with this command
 
-      $ bontmia | txt2man -t bontmia -s 1 > bontmia.1
+      $ bontmia --help | txt2man -t bontmia -B bontmia -s 1 > bontmia.1
 
 SEE ALSO
   rsync(1) ssh(1) ssh_config(5)
