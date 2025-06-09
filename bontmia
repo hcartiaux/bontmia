@@ -29,27 +29,27 @@ SYNOPSIS
 
 DESCRIPTION
 
-  bontmia is a network-based backup tool that saves configurable numbers of last
+  bontmia is a network-based backup tool that saves a configurable numbers of last
   month, week, day, hour, and minute backups. Each backup is a complete snapshot
-  of the original directories. Only new and changed files are copied over the
-  network when generating a snapshot. Remote access is implemented securely using
-  ssh. Unchanged files are stored as hard links in the archive and therefore takes
-  virtually no space.
+  of the original directories. Only new and changed files are copied
+  over the network when generating a snapshot. Remote access is implemented
+  securely using ssh. Unchanged files are stored as hard links in the archive
+  and therefore take virtually no space.
 
   The backups are stored in a directory structure in the format YYYY/MM/DD/HH:MM.
-  Each directory contains a snapshot of the backed up directories. This is stored
-  incrementally by letting every file not changed between backups be a hard link
-  to the same file in the previous backup. The actual copying is done with rsync.
-  To avoid typing in a password you do as usual with ssh by generating a public key
-  on the host where the backup is stored, read the manual page for ssh, and adding
-  this to the list of authorized hosts on the remote computer, read the manual
-  page for sshd.
+  Each directory contains a snapshot of the backed-up directories. This is
+  stored incrementally by hard-linking any files that haven't changed between
+  backups to the same file in the previous backup. The actual copying is done
+  with rsync. To avoid typing a password, you can generate a public key on the
+  host where the backup is stored (refer to the ssh manual page) and add it to
+  the list of authorized hosts on the remote computer (refer to the sshd manual
+  page).
 
-  Which backup to store for how long is configurable, see below.
+  The duration for which each backup is stored is configurable; see below.
 
   The return value is 0 on success and 1 if backing up one of the sources failed.
 
-  The destination can not be remote. If you want to place the backup on a remote
+  The destination cannot be remote. If you want to place the backup on a remote
   server, then run bontmia as a command with ssh:
 
       $ ssh user@host.domain bontmia <options>
@@ -60,30 +60,30 @@ ARGUMENTS
 
   --dest <dir>
 
-    Sets the destination directories where the backups is placed.
-    WARNING! existing files in this directory will be DELETED!
+    Sets the destination directory where the backups are placed.
+    WARNING! Existing files in this directory will be DELETED!
 
 OPTIONS
 
   --rotation <spec>
 
   Specifies the number of backups in each category to save.
-  The 'spec' is of the form
+  The 'spec' is of the form:
 
   [0-9]*minutes[0-9]*hours[0-9]*days[0-9]*weeks[0-9]*month[0-9]*years
 
-  So 0minutes0hours7days4weeks12month2years is an example for a daily backup.
-  Bontmia should be run in cron or manually, the numbers given here only
-  specifies how many backups to save.
+  For example, 0minutes0hours7days4weeks12month2years is for a daily backup.
+  Bontmia should be run in cron or manually; the numbers given here only
+  specify how many backups to save.
 
-  The different categories (minutes, hours ...) are just overlapping filters.
-  More than one filter might match a backup and a backup is removed when no
-  filter matches the backup any more.
+  The different categories (minutes, hours...) are just overlapping filters.
+  More than one filter might match a backup, and a backup is removed when no
+  filter matches it anymore.
 
   For example, if the number of days is 3, the last backup within each of the
-  last 3 days when backup were done will be kept. If you do your backups like
-  this (where y means the backup were done and - means it were not), on day 5,
-  the backups of day 2, 4 and 5 will be saved and the backup of day 0 will be
+  last 3 days when backups were done will be kept. If you do your backups like
+  this (where 'y' means the backup was done and '-' means it was not), on day 5,
+  the backups of day 2, 4, and 5 will be saved, and the backup of day 0 will be
   removed.
 
     day:    0 1 2 3 4 5
@@ -95,25 +95,23 @@ OPTIONS
 
   When this option is used, the backup is not performed, but the backups to be
   removed are listed. This is handy when you want to ensure that you do not
-  remove all the precious backups when used in combination with the rotation
+  remove all your precious backups when used in combination with the rotation
   option.
 
   --bwlimit <number>
 
   Specifies a maximum transfer rate in kilobytes per second. This option is
   most effective with large files (several megabytes and up). Due to the nature
-  of rsync transfers, blocks of data are sent, then if rsync determines the
+  of rsync transfers, blocks of data are sent; then, if rsync determines the
   transfer was too fast, it will wait before sending the next data block. The
-  result is an average transfer rate equalling the specified limit. A value of
+  result is an average transfer rate equaling the specified limit. A value of
   zero specifies no limit. The default is no limit.
 
   --temp <temp dir>
 
   Specifies the directory used for temporary files during transfer.
-  NB! This MUST be on the same disk volume as destination or incremental copy
-  will not work.
-
-  --port <number>
+  NB! This MUST be on the same disk volume as the destination or incremental copy
+...skipping...
 
   Specifies the port number to connect to on the remote host when using ssh,
   which is the only option.
@@ -125,23 +123,23 @@ OPTIONS
 
   --identity <file>
 
-  Specifies the private key file for ssh
+  Specifies the private key file for ssh.
 
   --exclude-from <file>
 
-  Read rsync exclude patterns from file
+  Read rsync exclude patterns from file.
 
   --sudo
 
-  Execute rsync with sudo on remote
+  Execute rsync with sudo on remote.
 
   --stats
 
-  Output rsync stats at the end
+  Output rsync stats at the end.
 
   --compression
 
-  Enable rsync compression, can be useful over a slow network link or
+  Enable rsync compression, which can be useful over a slow network link or
   counterproductive over a fast link.
 
 ENVIRONMENT
@@ -162,21 +160,21 @@ EXAMPLES
   every minute for the last 5 minutes. If it is run once every day, bontmia will
   keep the last 5 backups done at unique minutes.
 
-  Hint: set the values for times shorter than the interval used
-  when doing backup to 0.
+  Hint: Set the values for times shorter than the interval used
+  when doing backups to 0.
 
 
       $ bontmia --dest ./backup --rotation 0minutes0hours7days4weeks12month0years foo@bar:/baz/zoot
 
-  Here there will at the most be stored 7 + 4 + 12 backups (minus overlap between
+  Here, at most, 7 + 4 + 12 backups will be stored (minus overlap between
   the backups). This can be a good command to run nightly.
 
 
       $ bontmia --dest ./backup --rotation 0minutes24hours7days4weeks12month0years foo@bar:/baz/zoot
 
-  This is for running every hour. Remember that only the changes are transferred
-  and running more than every hour is not necessarily will mean copying more data
-  over the network.
+  This is for running every hour. Remember that only the changes are transferred,
+  and running more frequently than every hour does not necessarily mean copying
+  more data over the network.
 
 
       $ bontmia --dryrun --dest ./backup --rotation 0minutes24hours7days4weeks12month0years /home/bar/baz foo.no:/var/db
@@ -184,12 +182,12 @@ EXAMPLES
   With the dryrun option, bontmia shows what would happen if the backup
   were run. No action on the file system will be done.
 
-  When bontmia runs, it sends its output to the standard output. If you do not
-  want this you can redirect it to /dev/null.
+  When bontmia runs, it sends its output to standard output. If you do not
+  want this, you can redirect it to /dev/null.
 
 MANPAGE
 
-  The manpage has been generated with this command
+  The manpage has been generated with this command:
 
       $ bontmia --help | txt2man -t bontmia -B bontmia -s 1 > bontmia.1
 
@@ -197,12 +195,12 @@ SEE ALSO
   rsync(1) ssh(1) ssh_config(5)
 
 CONTACT
-  Bontmia was written in april 2003 by John Enok Vollestad <john.enok@vollestad.no>
-  to merge the functionality of glastree and rsync in one application with a more
-  flexible selection of long term storage. It has later undergone some bugfixes
-  and enhancements.
+  Bontmia was written in April 2003 by John Enok Vollestad to merge the
+  functionality of glastree and rsync in one application with a more flexible
+  selection of long-term storage.
+  It has later undergone some bug fixes and enhancements.
 
-  This version is a fork, the diff can be found on github: https://github.com/hcartiaux/bontmia
+  This version is a fork; the diff can be found on GitHub: https://github.com/hcartiaux/bontmia
 
 EOF
     exit 1
