@@ -473,7 +473,7 @@ delete_old_backup()
             fi
         else
             printf "  Saving %s/%s by filters:  " "$backup_destination" "$archive"
-            filters=$(echo "${archives_with_filter}" | grep "${archive}" | cut -f2 -d'@')
+            filters=$(echo "${archives_with_filter}" | grep "${archive}" | cut -f2 -d'@' | tr '\n' ' ')
             echo "${filters}"
         fi
     done
