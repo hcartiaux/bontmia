@@ -225,9 +225,7 @@ output_rsync_stats()
 lock_destination()
 {
     # Ensure that there is no other bontmia running against the same destination
-    touch /tmp/bontmia_lock_file.$$
-    echo "no" | mv -i /tmp/bontmia_lock_file.$$ "${tmpdir}"/is_running.lock 2>&1 | \
-    grep "overwrite" >/dev/null 2>&1 && {
+    if test -e "${tmpdir}/is_running.lock" ; then
         echo "Bontmia is already doing a backup on this tmpdir:"
         echo "    ${tmpdir}"
         echo
@@ -235,7 +233,8 @@ lock_destination()
         echo "        ${tmpdir}/is_running.lock"
         echo
         exit 1
-    }
+    fi
+    touch "${tmpdir}/is_running.lock"
 }
 
 
@@ -254,7 +253,7 @@ filter_template()
     fi
 
     (
-        cd "${backup_destination}"
+        cd "${backup_destination}" || exit 1
         for archive in */*/*/*; do
             year=$(     echo "${archive}" | cut -f1 -d'/')
             month=$(    echo "${archive}" | cut -f2 -d'/')
@@ -268,7 +267,7 @@ filter_template()
                 unlock_destination
                 exit 1
             }
-        done | grep -E "@.*@${grep_value}" | sort -r | $sort | tail -$last_number
+        done | grep -E "@.*@${grep_value}" | sort -r | $sort | tail -"${last_number}"
     )
 }
 
@@ -363,9 +362,10 @@ make_backup()
         if test "${dryrun}" = "no"; then
             mkdir -p "${tmpdir}/unfinished_backup/${this_backup}/${hostname}"
 
+            # shellcheck disable=SC2086
             rsync ${RSYNC_CMD} ${rsync_options} ${excludefrom:+--exclude-from="$excludefrom"} ${linkdest:+--link-dest="${linkdest}"} \
                   -T "${tmpdir}" ${rsyncpath:+--rsync-path="${rsyncpath}"} -e "ssh $cipher -p $port $identity"          \
-                  "${dir}/" "${tmpdir}/unfinished_backup/$this_backup/${hostname}" 2>&1 >/tmp/bontmia_rsync_output.$$ || {
+                  "${dir}/" "${tmpdir}/unfinished_backup/$this_backup/${hostname}" >/tmp/bontmia_rsync_output.$$ 2>&1 || {
                 rsync_exit_status=$?
                 echo
                 echo "  Caught an error doing rsync (return code ${rsync_exit_status})"
@@ -375,7 +375,7 @@ make_backup()
                 echo "  Retrying rsync..."
                 rsync ${RSYNC_CMD} ${rsync_options} ${excludefrom:+--exclude-from="$excludefrom"} ${linkdest:+--link-dest="${linkdest}"} \
                       -T "${tmpdir}" ${rsyncpath:+--rsync-path="${rsyncpath}"} -e "ssh $cipher -p $port $identity"          \
-                      "${dir}/" "${tmpdir}/unfinished_backup/$this_backup/${hostname}" 2>&1 >/tmp/bontmia_rsync_output.$$.2 || {
+                      "${dir}/" "${tmpdir}/unfinished_backup/$this_backup/${hostname}" >/tmp/bontmia_rsync_output.$$.2 2>&1 || {
                     rsync_exit_status=$?
                     # The backup is considered successfull, even if some files have vanished during the transfer
                     if [[ $rsync_exit_status != 24 && $rsync_exit_status != 23 ]]; then
@@ -462,19 +462,19 @@ delete_old_backup()
     archives_to_save=$(echo "${archives_with_filter}" | cut -f1 -d'@' | sort -u)
 
     (
-    cd "${backup_destination}"
+    cd "${backup_destination}" || exit 1
     for archive in */*/*/*; do
         if ! echo "${archives_to_save}" | grep "^${archive}$" >/dev/null; then
             echo " Removing ${backup_destination}/$archive"
             if test "${dryrun}" = "no"; then
                 chmod -R u+w "${archive}"
                 rm -rf "${archive}"
-                rmdir -p $(echo "${archive}" | cut -f1-3 -d'/') 2>/dev/null
+                rmdir -p "$(echo "${archive}" | cut -f1-3 -d'/')" 2>/dev/null
             fi
         else
             printf "  Saving %s/%s by filters:  " "$backup_destination" "$archive"
             filters=$(echo "${archives_with_filter}" | grep "${archive}" | cut -f2 -d'@')
-            echo $filters
+            echo "${filters}"
         fi
     done
     )
@@ -629,6 +629,7 @@ check_system()
 
     fi
 
+    # shellcheck disable=SC2086
     if test -n "${cipher}" && test "$(ssh $cipher 2>&1| grep -c 'Unknown cipher type')" != "0" ; then
         echo "This cipher (${cipher}) is not supported by your local ssh version"
         echo "Aborting"
@@ -675,7 +676,7 @@ while [ $# -gt 0 ]; do
       dryrun="yes";;
   ( "--rotation" )
       shift
-      rotation=$(echo $1 | perl -e '$_=<STDIN>; m/^([0-9]*)minutes([0-9]*)hours([0-9]*)days([0-9]*)weeks([0-9]*)month([0-9]*)years$/ || exit 1;
+      rotation=$(echo "$1" | perl -e '$_=<STDIN>; m/^([0-9]*)minutes([0-9]*)hours([0-9]*)days([0-9]*)weeks([0-9]*)month([0-9]*)years$/ || exit 1;
 print "minutes:$1\n";
 print "hours:$2\n";
 print "days:$3\n";
@@ -769,8 +770,7 @@ print "years:$6\n";
       done
       shift $#;;
   ( * )
-      print_usage
-      exit 1;;
+      print_usage;;
     esac
 done
 
