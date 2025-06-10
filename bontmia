@@ -465,14 +465,14 @@ delete_old_backup()
     cd "${backup_destination}" || exit 1
     for archive in */*/*/*; do
         if ! echo "${archives_to_save}" | grep "^${archive}$" >/dev/null; then
-            echo " Removing ${backup_destination}/$archive"
+            echo " Removing ${backup_destination}/${archive}"
             if test "${dryrun}" = "no"; then
                 chmod -R u+w "${archive}"
                 rm -rf "${archive}"
                 rmdir -p "$(echo "${archive}" | cut -f1-3 -d'/')" 2>/dev/null
             fi
         else
-            printf "  Saving %s/%s by filters:  " "$backup_destination" "$archive"
+            printf "  Saving %s/%s by filters:  " "${backup_destination}" "${archive}"
             filters=$(echo "${archives_with_filter}" | grep "${archive}" | cut -f2 -d'@' | tr '\n' ' ')
             echo "${filters}"
         fi
